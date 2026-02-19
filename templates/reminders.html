@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Reminders — ACRE CRM{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0"><i class="bi bi-bell-fill text-warning me-2"></i>Reminders</h2>
+    <span class="text-muted small">All upcoming follow-ups in one place</span>
+  </div>
+  <button class="btn btn-warning fw-semibold" data-bs-toggle="modal" data-bs-target="#quickReminderModal">
+    <i class="bi bi-plus-lg me-1"></i>Add Reminder
+  </button>
+</div>
+
+{% set total = outreach_reminders|length + contact_reminders|length %}
+
+{% if total == 0 %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-bell-slash fs-1 d-block mb-2"></i>
+  No reminders set. Use the <strong>+ Reminder</strong> button to add one from anywhere.
+</div>
+{% endif %}
+
+<!-- Deal Follow-ups -->
+{% if outreach_reminders %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-send me-2 text-primary"></i>Deal Follow-ups <span class="badge bg-primary ms-1">{{ outreach_reminders|length }}</span></h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Due Date</th><th>Contact</th><th>Deal</th><th>Stage</th><th>Summary</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for o in outreach_reminders %}
+          {% set overdue = o.follow_up_date and o.follow_up_date < today %}
+          <tr {% if overdue %}class="table-danger"{% endif %}>
+            <td class="text-nowrap fw-semibold {% if overdue %}text-danger{% endif %}">
+              {% if o.follow_up_date %}{{ o.follow_up_date }}{% else %}<span class="text-muted">No date</span>{% endif %}
+              {% if overdue %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}
+            </td>
+            <td>
+              <div class="fw-semibold">{{ o.contact_name }}</div>
+              {% if o.company %}<div class="text-muted small">{{ o.company }}</div>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('deal_detail', deal_id=o.deal_id) }}" class="fw-semibold text-decoration-none">{{ o.deal_name }}</a>
+            </td>
+            <td>
+              {% if o.stage %}<span class="badge stage-badge stage-{{ o.stage|lower|replace(' ', '-')|replace('/', '') }}">{{ o.stage }}</span>{% else %}—{% endif %}
+            </td>
+            <td><span class="text-truncate-cell small" title="{{ o.outreach_summary }}">{{ o.outreach_summary or '—' }}</span></td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('edit_outreach', deal_id=o.deal_id, outreach_id=o.id) }}" class="btn btn-sm btn-outline-secondary">Update</a>
+                <form method="POST" action="{{ url_for('dismiss_reminder', kind='outreach', rid=o.id) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Mark done"><i class="bi bi-check-lg"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- GP Contact Reminders -->
+{% if contact_reminders %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-people me-2 text-info"></i>GP Contact Touch-points <span class="badge bg-info ms-1">{{ contact_reminders|length }}</span></h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Due Date</th><th>Contact</th><th>Company</th><th>Status</th><th>Last Contacted</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for c in contact_reminders %}
+          {% set overdue = c.next_contact_date < today %}
+          <tr {% if overdue %}class="table-warning"{% endif %}>
+            <td class="text-nowrap fw-semibold {% if overdue %}text-danger{% endif %}">
+              {{ c.next_contact_date }}
+              {% if overdue %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+              {% if c.title %}<div class="text-muted small">{{ c.title }}</div>{% endif %}
+            </td>
+            <td class="text-muted">{{ c.company or '—' }}</td>
+            <td>
+              <span class="badge {% if c.status == 'Hot Lead' %}bg-danger{% elif c.status == 'In Contact' %}bg-primary{% elif c.status == 'Meeting Scheduled' %}bg-success{% else %}bg-secondary{% endif %}">{{ c.status }}</span>
+            </td>
+            <td class="text-muted small">{{ c.last_contacted or '—' }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-secondary">Update</a>
+                <form method="POST" action="{{ url_for('dismiss_reminder', kind='contact', rid=c.id) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Dismiss"><i class="bi bi-check-lg"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

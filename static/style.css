@@ -1,46 +1,145 @@
+/* ── Base ─────────────────────────────────────────────────────────── */
 body {
-  background-color: #f0f2f8;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #f4f5f9;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1a1f2e;
 }
 
-/* Stat cards */
-.stat-card .card-body { padding: 1.4rem 1.25rem; }
-.stat-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
-.stat-value { font-size: 2.2rem; font-weight: 700; line-height: 1; margin-bottom: 0.2rem; }
-.stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: #8892a4; }
-
-/* Activity dot */
-.activity-dot {
-  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+/* ── Navbar ───────────────────────────────────────────────────────── */
+.navbar .nav-link {
+  font-size: 0.875rem;
+  transition: background .12s;
+  letter-spacing: .01em;
 }
+.navbar .nav-link:hover { background: rgba(255,255,255,.09); }
+.navbar-brand { font-size: 1.05rem; letter-spacing: -.01em; }
 
-/* Cards */
+/* ── Cards ────────────────────────────────────────────────────────── */
 .card { border-radius: 10px; }
-.card-header { border-bottom: 1px solid rgba(0,0,0,.07); }
+.card-header {
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  background: #fff;
+}
 
-/* Text truncation */
+/* ── Stat cards ───────────────────────────────────────────────────── */
+.stat-card .card-body { padding: 1.3rem 1.25rem; }
+.stat-icon { font-size: 1.5rem; margin-bottom: .4rem; }
+.stat-value { font-size: 2.1rem; font-weight: 700; line-height: 1; margin-bottom: .2rem; }
+.stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .65px; color: #8892a4; font-weight: 600; }
+
+/* ── Activity dot ─────────────────────────────────────────────────── */
+.activity-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+
+/* ── Tables ───────────────────────────────────────────────────────── */
+.table td, .table th { vertical-align: middle; font-size: 0.855rem; }
+.table thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #868e96;
+  font-weight: 600;
+}
+
+/* ── Text truncation ──────────────────────────────────────────────── */
 .text-truncate-cell {
-  display: inline-block; max-width: 200px; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; vertical-align: middle; cursor: default;
+  display: inline-block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  cursor: default;
 }
 
-/* Forms */
+/* ── Forms ────────────────────────────────────────────────────────── */
 .form-control:focus, .form-select:focus {
-  border-color: #4e73df;
-  box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.15);
+  border-color: #5b6af0;
+  box-shadow: 0 0 0 3px rgba(91,106,240,.12);
+}
+.form-label { font-size: .875rem; margin-bottom: .3rem; }
+
+/* Section label (replaces <h6 uppercase>) */
+.section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: #8892a4;
+  margin-bottom: .75rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid #eef0f4;
 }
 
-/* Tables */
-.table td, .table th { vertical-align: middle; font-size: 0.875rem; }
-.table thead th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+/* ── Alerts ───────────────────────────────────────────────────────── */
+.alert { border-radius: 8px; font-size: .875rem; }
 
-/* Alerts */
-.alert { border-radius: 8px; }
+/* ── Deal metrics strip ───────────────────────────────────────────── */
+.metric-strip { gap: 0; }
+.metric-item {
+  border-right: 1px solid #eef0f4;
+  padding: .6rem .5rem;
+}
+.metric-item:last-child { border-right: none; }
+.metric-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+.metric-lbl {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #8892a4;
+  font-weight: 600;
+  margin-top: 2px;
+}
 
-/* Navbar */
-.navbar .nav-link { font-size: 0.9rem; transition: background .15s; }
-.navbar .nav-link:hover { background: rgba(255,255,255,.08); }
-.navbar-brand { font-size: 1.1rem; }
+/* ── Investor pipeline funnel ─────────────────────────────────────── */
+.pipeline-stages { align-items: stretch; }
+.pipeline-stage {
+  min-width: 90px;
+  background: #f8f9fc;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: .6rem .75rem;
+  text-align: center;
+  flex: 1;
+}
+.pipeline-stage--active {
+  background: #eef1ff;
+  border-color: #c7cfff;
+}
+.pipeline-count { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.pipeline-name { font-size: .65rem; text-transform: uppercase; letter-spacing: .4px; color: #6c757d; font-weight: 600; margin-top: 3px; }
 
-/* Pre in template cards */
+/* ── Stage badges ─────────────────────────────────────────────────── */
+.stage-badge { font-size: .72rem; font-weight: 600; }
+.stage-initial-email    { background: #e9ecef; color: #495057; }
+.stage-om-sent          { background: #cfe2ff; color: #084298; }
+.stage-nda-signed       { background: #d1ecf1; color: #0c5460; }
+.stage-call--meeting    { background: #d4edda; color: #155724; }
+.stage-deep-dive--dd    { background: #fff3cd; color: #856404; }
+.stage-soft-circle      { background: #ffe5d0; color: #7d3100; }
+.stage-hard-commit      { background: #d4edda; color: #155724; }
+.stage-passed           { background: #f8d7da; color: #842029; }
+
+/* ── Pre in template cards ────────────────────────────────────────── */
 pre { background: transparent; }
+
+/* ── Code blocks for email setup instructions ─────────────────────── */
+.setup-step {
+  background: #f8f9fc;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: .75rem;
+  font-size: .875rem;
+}
+.setup-step code {
+  background: #1a1f2e;
+  color: #7dd3fc;
+  padding: .15rem .45rem;
+  border-radius: 4px;
+  font-size: .82rem;
+}

@@ -26,6 +26,17 @@ def init_db():
             target_raise TEXT,
             status TEXT DEFAULT 'Active',
             notes TEXT,
+            purchase_price TEXT,
+            units_sf TEXT,
+            noi_current TEXT,
+            noi_projected TEXT,
+            cap_rate TEXT,
+            exit_cap_rate TEXT,
+            ltv TEXT,
+            hold_period TEXT,
+            irr_target TEXT,
+            equity_multiple TEXT,
+            closing_date TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -42,6 +53,8 @@ def init_db():
             response_summary TEXT,
             follow_up_needed INTEGER DEFAULT 0,
             follow_up_date TEXT,
+            stage TEXT DEFAULT 'Initial Email',
+            interest_level TEXT DEFAULT 'Unknown',
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (deal_id) REFERENCES deals(id)
         );
@@ -87,9 +100,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT,
             body TEXT,
+            from_addr TEXT,
             to_addr TEXT,
             cc_addr TEXT,
             sent_on TEXT,
+            direction TEXT DEFAULT 'sent',
+            tags TEXT,
             deal_id INTEGER,
             contact_id INTEGER,
             entry_id TEXT UNIQUE,
@@ -103,6 +119,22 @@ def init_db():
     for stmt in [
         "ALTER TABLE outreach ADD COLUMN follow_up_date TEXT",
         "ALTER TABLE gp_contacts ADD COLUMN next_contact_date TEXT",
+        "ALTER TABLE outreach ADD COLUMN stage TEXT DEFAULT 'Initial Email'",
+        "ALTER TABLE outreach ADD COLUMN interest_level TEXT DEFAULT 'Unknown'",
+        "ALTER TABLE deals ADD COLUMN purchase_price TEXT",
+        "ALTER TABLE deals ADD COLUMN units_sf TEXT",
+        "ALTER TABLE deals ADD COLUMN noi_current TEXT",
+        "ALTER TABLE deals ADD COLUMN noi_projected TEXT",
+        "ALTER TABLE deals ADD COLUMN cap_rate TEXT",
+        "ALTER TABLE deals ADD COLUMN exit_cap_rate TEXT",
+        "ALTER TABLE deals ADD COLUMN ltv TEXT",
+        "ALTER TABLE deals ADD COLUMN hold_period TEXT",
+        "ALTER TABLE deals ADD COLUMN irr_target TEXT",
+        "ALTER TABLE deals ADD COLUMN equity_multiple TEXT",
+        "ALTER TABLE deals ADD COLUMN closing_date TEXT",
+        "ALTER TABLE emails ADD COLUMN from_addr TEXT",
+        "ALTER TABLE emails ADD COLUMN direction TEXT DEFAULT 'sent'",
+        "ALTER TABLE emails ADD COLUMN tags TEXT",
     ]:
         try:
             conn.execute(stmt)
@@ -201,6 +233,17 @@ def score_gp(deal, gp):
     return score, reasons
 
 
+# ── Template context ───────────────────────────────────────────────────────────
+
+@app.context_processor
+def inject_globals():
+    conn = get_db()
+    gp_contacts = conn.execute("SELECT id, name, company FROM gp_contacts ORDER BY name").fetchall()
+    deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
+    conn.close()
+    return dict(_all_gp_contacts=gp_contacts, _all_deals=deals, today=date.today().isoformat())
+
+
 # ── Dashboard ──────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -272,10 +315,19 @@ def new_deal():
     if request.method == "POST":
         conn = get_db()
         conn.execute(
-            "INSERT INTO deals (name, asset_type, location, target_raise, status, notes) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO deals (name, asset_type, location, target_raise, status, notes, "
+            "purchase_price, units_sf, noi_current, noi_projected, cap_rate, exit_cap_rate, "
+            "ltv, hold_period, irr_target, equity_multiple, closing_date) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (request.form["name"], request.form.get("asset_type", ""),
              request.form.get("location", ""), request.form.get("target_raise", ""),
-             request.form.get("status", "Active"), request.form.get("notes", "")),
+             request.form.get("status", "Active"), request.form.get("notes", ""),
+             request.form.get("purchase_price", "") or None, request.form.get("units_sf", "") or None,
+             request.form.get("noi_current", "") or None, request.form.get("noi_projected", "") or None,
+             request.form.get("cap_rate", "") or None, request.form.get("exit_cap_rate", "") or None,
+             request.form.get("ltv", "") or None, request.form.get("hold_period", "") or None,
+             request.form.get("irr_target", "") or None, request.form.get("equity_multiple", "") or None,
+             request.form.get("closing_date", "") or None),
         )
         conn.commit(); conn.close()
         flash("Deal created.", "success")
@@ -312,10 +364,18 @@ def edit_deal(deal_id):
         conn.close(); flash("Deal not found.", "danger"); return redirect(url_for("deals"))
     if request.method == "POST":
         conn.execute(
-            "UPDATE deals SET name=?, asset_type=?, location=?, target_raise=?, status=?, notes=? WHERE id=?",
+            "UPDATE deals SET name=?, asset_type=?, location=?, target_raise=?, status=?, notes=?, "
+            "purchase_price=?, units_sf=?, noi_current=?, noi_projected=?, cap_rate=?, exit_cap_rate=?, "
+            "ltv=?, hold_period=?, irr_target=?, equity_multiple=?, closing_date=? WHERE id=?",
             (request.form["name"], request.form.get("asset_type", ""),
              request.form.get("location", ""), request.form.get("target_raise", ""),
-             request.form.get("status", "Active"), request.form.get("notes", ""), deal_id),
+             request.form.get("status", "Active"), request.form.get("notes", ""),
+             request.form.get("purchase_price", "") or None, request.form.get("units_sf", "") or None,
+             request.form.get("noi_current", "") or None, request.form.get("noi_projected", "") or None,
+             request.form.get("cap_rate", "") or None, request.form.get("exit_cap_rate", "") or None,
+             request.form.get("ltv", "") or None, request.form.get("hold_period", "") or None,
+             request.form.get("irr_target", "") or None, request.form.get("equity_multiple", "") or None,
+             request.form.get("closing_date", "") or None, deal_id),
         )
         conn.commit(); conn.close()
         flash("Deal updated.", "success")
@@ -345,14 +405,16 @@ def new_outreach(deal_id):
     if request.method == "POST":
         conn.execute(
             "INSERT INTO outreach (deal_id, contact_name, company, email, sent_by, "
-            "outreach_date, outreach_summary, response_date, response_summary, follow_up_needed, follow_up_date) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "outreach_date, outreach_summary, response_date, response_summary, follow_up_needed, follow_up_date, "
+            "stage, interest_level) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (deal_id, request.form["contact_name"], request.form.get("company", ""),
              request.form.get("email", ""), request.form.get("sent_by", ""),
              request.form.get("outreach_date") or None, request.form.get("outreach_summary", ""),
              request.form.get("response_date") or None, request.form.get("response_summary", ""),
              1 if request.form.get("follow_up_needed") else 0,
-             request.form.get("follow_up_date") or None),
+             request.form.get("follow_up_date") or None,
+             request.form.get("stage", "Initial Email"), request.form.get("interest_level", "Unknown")),
         )
         conn.commit(); conn.close()
         flash("Outreach logged.", "success")
@@ -372,13 +434,15 @@ def edit_outreach(deal_id, outreach_id):
         conn.execute(
             "UPDATE outreach SET contact_name=?, company=?, email=?, sent_by=?, "
             "outreach_date=?, outreach_summary=?, response_date=?, response_summary=?, "
-            "follow_up_needed=?, follow_up_date=? WHERE id=?",
+            "follow_up_needed=?, follow_up_date=?, stage=?, interest_level=? WHERE id=?",
             (request.form["contact_name"], request.form.get("company", ""),
              request.form.get("email", ""), request.form.get("sent_by", ""),
              request.form.get("outreach_date") or None, request.form.get("outreach_summary", ""),
              request.form.get("response_date") or None, request.form.get("response_summary", ""),
              1 if request.form.get("follow_up_needed") else 0,
-             request.form.get("follow_up_date") or None, outreach_id),
+             request.form.get("follow_up_date") or None,
+             request.form.get("stage", "Initial Email"), request.form.get("interest_level", "Unknown"),
+             outreach_id),
         )
         conn.commit(); conn.close()
         flash("Outreach updated.", "success")
@@ -650,6 +714,11 @@ def outlook_import(deal_id):
 def emails():
     q = request.args.get("q", "").strip()
     deal_filter = request.args.get("deal_id", "")
+    direction_filter = request.args.get("direction", "")
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    tag_filter = request.args.get("tag", "")
+
     conn = get_db()
     sql = (
         "SELECT e.*, d.name as deal_name, g.name as gp_name "
@@ -660,28 +729,120 @@ def emails():
     )
     params = []
     if q:
-        sql += " AND (e.subject LIKE ? OR e.body LIKE ? OR e.to_addr LIKE ?)"
-        params += [f"%{q}%"] * 3
+        sql += " AND (e.subject LIKE ? OR e.body LIKE ? OR e.to_addr LIKE ? OR e.from_addr LIKE ?)"
+        params += [f"%{q}%"] * 4
     if deal_filter:
         sql += " AND e.deal_id = ?"
         params.append(deal_filter)
-    sql += " ORDER BY e.sent_on DESC LIMIT 300"
+    if direction_filter:
+        sql += " AND e.direction = ?"
+        params.append(direction_filter)
+    if date_from:
+        sql += " AND e.sent_on >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND e.sent_on <= ?"
+        params.append(date_to)
+    if tag_filter:
+        sql += " AND (',' || e.tags || ',') LIKE ?"
+        params.append(f"%,{tag_filter},%")
+
+    sql += " ORDER BY e.sent_on DESC LIMIT 500"
     rows = conn.execute(sql, params).fetchall()
     deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
+    contacts = conn.execute("SELECT id, name FROM gp_contacts ORDER BY name").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
+    # All distinct tags
+    raw_tags = conn.execute("SELECT tags FROM emails WHERE tags IS NOT NULL AND tags != ''").fetchall()
+    all_tags = sorted(set(
+        t.strip() for row in raw_tags for t in row["tags"].split(",") if t.strip()
+    ))
     conn.close()
-    return render_template("emails.html", emails=rows, q=q, deals=deals,
-                           deal_filter=deal_filter, total=total)
+    return render_template(
+        "emails.html", emails=rows, q=q, deals=deals, contacts=contacts,
+        deal_filter=deal_filter, direction_filter=direction_filter,
+        date_from=date_from, date_to=date_to, tag_filter=tag_filter,
+        total=total, all_tags=all_tags,
+    )
+
+
+@app.route("/emails/<int:email_id>")
+def email_detail(email_id):
+    conn = get_db()
+    email = conn.execute(
+        "SELECT e.*, d.name as deal_name, g.name as gp_name "
+        "FROM emails e "
+        "LEFT JOIN deals d ON e.deal_id = d.id "
+        "LEFT JOIN gp_contacts g ON e.contact_id = g.id "
+        "WHERE e.id = ?", (email_id,)
+    ).fetchone()
+    deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
+    contacts = conn.execute("SELECT id, name FROM gp_contacts ORDER BY name").fetchall()
+    conn.close()
+    if not email:
+        flash("Email not found.", "danger"); return redirect(url_for("emails"))
+    return render_template("email_detail.html", email=email, deals=deals, contacts=contacts)
+
+
+def _sync_folder(folder, direction, cutoff, conn, contact_email_map, deal_keywords, own_addrs):
+    synced = skipped = 0
+    for item in folder.Items:
+        try:
+            if item.Class != 43:
+                continue
+            sent_on = item.SentOn.replace(tzinfo=None) if hasattr(item, 'SentOn') else None
+            received_on = item.ReceivedTime.replace(tzinfo=None) if hasattr(item, 'ReceivedTime') else None
+            ts = sent_on or received_on
+            if not ts or ts < cutoff:
+                continue
+            entry_id = item.EntryID
+            subject = item.Subject or ""
+            body = (item.Body or "")[:10000]
+            to_addr = item.To or ""
+            cc_addr = item.CC or ""
+            from_addr = item.SenderEmailAddress or item.SenderName or ""
+            sent_on_str = ts.strftime("%Y-%m-%d")
+
+            # Auto-match GP contact
+            contact_id = None
+            all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
+            for addr in all_addrs.split(";"):
+                addr = addr.strip()
+                if addr and addr not in own_addrs and addr in contact_email_map:
+                    contact_id = contact_email_map[addr]
+                    break
+
+            # Auto-match deal by keywords in subject
+            deal_id = None
+            subject_lower = subject.lower()
+            for words, d_id in deal_keywords:
+                if any(w in subject_lower for w in words):
+                    deal_id = d_id
+                    break
+
+            try:
+                conn.execute(
+                    "INSERT INTO emails (subject, body, from_addr, to_addr, cc_addr, sent_on, "
+                    "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (subject, body, from_addr, to_addr, cc_addr, sent_on_str,
+                     direction, deal_id, contact_id, entry_id),
+                )
+                synced += 1
+            except Exception:
+                skipped += 1
+        except Exception:
+            continue
+    return synced, skipped
 
 
 @app.route("/emails/sync", methods=["POST"])
 def sync_emails():
     days = int(request.form.get("days", 90))
+    include_inbox = request.form.get("include_inbox") == "1"
     try:
         import win32com.client
         outlook = win32com.client.Dispatch("Outlook.Application")
         ns = outlook.GetNamespace("MAPI")
-        sent_folder = ns.GetDefaultFolder(5)  # 5 = Sent Items
         cutoff = datetime.now() - timedelta(days=days)
 
         conn = get_db()
@@ -689,65 +850,36 @@ def sync_emails():
         contacts = conn.execute(
             "SELECT id, email FROM gp_contacts WHERE email IS NOT NULL AND email != ''"
         ).fetchall()
-
         contact_email_map = {c["email"].lower().strip(): c["id"] for c in contacts}
-        # Build deal keyword list: use words >3 chars from deal name
         deal_keywords = []
         for d in deals:
             words = [w for w in d["name"].lower().split() if len(w) > 3]
             if words:
                 deal_keywords.append((words[:3], d["id"]))
 
-        synced = skipped = 0
-        for item in sent_folder.Items:
-            try:
-                if item.Class != 43:
-                    continue
-                sent_on = item.SentOn.replace(tzinfo=None)
-                if sent_on < cutoff:
-                    continue
-                entry_id = item.EntryID
-                subject = item.Subject or ""
-                body = (item.Body or "")[:8000]
-                to_addr = item.To or ""
-                cc_addr = item.CC or ""
-                sent_on_str = sent_on.strftime("%Y-%m-%d")
+        # Get own email addresses to avoid self-matching
+        own_addrs = set()
+        try:
+            for acct in ns.Accounts:
+                own_addrs.add(acct.SmtpAddress.lower().strip())
+        except Exception:
+            pass
 
-                # Auto-match GP contact by email address
-                contact_id = None
-                all_recipients = (to_addr + ";" + cc_addr).lower().replace(",", ";")
-                for addr in all_recipients.split(";"):
-                    addr = addr.strip()
-                    if addr in contact_email_map:
-                        contact_id = contact_email_map[addr]
-                        break
+        # Sync Sent Items (folder 5)
+        sent_folder = ns.GetDefaultFolder(5)
+        synced, skipped = _sync_folder(sent_folder, "sent", cutoff, conn, contact_email_map, deal_keywords, own_addrs)
 
-                # Auto-match deal by keywords in subject
-                deal_id = None
-                subject_lower = subject.lower()
-                for words, d_id in deal_keywords:
-                    if any(w in subject_lower for w in words):
-                        deal_id = d_id
-                        break
-
-                try:
-                    conn.execute(
-                        "INSERT INTO emails (subject, body, to_addr, cc_addr, sent_on, "
-                        "deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (subject, body, to_addr, cc_addr, sent_on_str,
-                         deal_id, contact_id, entry_id),
-                    )
-                    synced += 1
-                except Exception:
-                    skipped += 1  # duplicate entry_id — already imported
-            except Exception:
-                continue
+        # Optionally sync Inbox (folder 6)
+        if include_inbox:
+            inbox = ns.GetDefaultFolder(6)
+            s2, sk2 = _sync_folder(inbox, "received", cutoff, conn, contact_email_map, deal_keywords, own_addrs)
+            synced += s2; skipped += sk2
 
         conn.commit()
         conn.close()
-        flash(f"Synced {synced} new emails. {skipped} already imported.", "success")
+        flash(f"Synced {synced} new emails ({skipped} already imported).", "success")
     except ImportError:
-        flash("pywin32 not installed. In your Command Prompt run: pip install pywin32", "danger")
+        flash("pywin32 not installed. Run: pip install pywin32", "danger")
     except Exception as e:
         flash(f"Could not connect to Outlook: {e}", "danger")
     return redirect(url_for("emails"))
@@ -757,16 +889,107 @@ def sync_emails():
 def link_email(email_id):
     deal_id = request.form.get("deal_id") or None
     contact_id = request.form.get("contact_id") or None
+    tags = request.form.get("tags", "").strip()
     conn = get_db()
     conn.execute(
-        "UPDATE emails SET deal_id=?, contact_id=? WHERE id=?",
-        (deal_id, contact_id, email_id),
+        "UPDATE emails SET deal_id=?, contact_id=?, tags=? WHERE id=?",
+        (deal_id, contact_id, tags or None, email_id),
     )
     conn.commit()
     conn.close()
-    flash("Email linked.", "success")
-    return redirect(url_for("emails", q=request.form.get("q", ""),
-                            deal_id=request.form.get("deal_filter", "")))
+    flash("Email updated.", "success")
+    return redirect(url_for("email_detail", email_id=email_id))
+
+
+@app.route("/emails/<int:email_id>/delete", methods=["POST"])
+def delete_email(email_id):
+    conn = get_db()
+    conn.execute("DELETE FROM emails WHERE id = ?", (email_id,))
+    conn.commit(); conn.close()
+    flash("Email removed from archive.", "info")
+    return redirect(url_for("emails"))
+
+
+# ── Reminders ──────────────────────────────────────────────────────────────────
+
+@app.route("/reminders")
+def reminders():
+    today = date.today().isoformat()
+    conn = get_db()
+    outreach_reminders = conn.execute(
+        "SELECT o.*, d.name as deal_name FROM outreach o "
+        "JOIN deals d ON o.deal_id = d.id "
+        "WHERE o.follow_up_needed = 1 "
+        "ORDER BY COALESCE(o.follow_up_date, '9999') ASC",
+    ).fetchall()
+    contact_reminders = conn.execute(
+        "SELECT * FROM gp_contacts WHERE next_contact_date IS NOT NULL AND next_contact_date != '' "
+        "ORDER BY next_contact_date ASC",
+    ).fetchall()
+    all_contacts = conn.execute("SELECT id, name, company FROM gp_contacts ORDER BY name").fetchall()
+    all_deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
+    conn.close()
+    return render_template(
+        "reminders.html",
+        outreach_reminders=outreach_reminders,
+        contact_reminders=contact_reminders,
+        all_contacts=all_contacts,
+        all_deals=all_deals,
+        today=today,
+    )
+
+
+@app.route("/reminders/quick", methods=["POST"])
+def quick_reminder():
+    """Quick follow-up reminder — can link to a GP contact or a deal outreach."""
+    contact_id = request.form.get("contact_id") or None
+    deal_id = request.form.get("deal_id") or None
+    contact_name = request.form.get("contact_name", "").strip()
+    reminder_date = request.form.get("reminder_date") or None
+    note = request.form.get("note", "").strip()
+
+    conn = get_db()
+
+    if contact_id:
+        # Set next_contact_date on the GP contact
+        conn.execute(
+            "UPDATE gp_contacts SET next_contact_date=? WHERE id=?",
+            (reminder_date, contact_id),
+        )
+        if note:
+            conn.execute(
+                "INSERT INTO contact_notes (contact_id, note_date, note_text) VALUES (?, ?, ?)",
+                (contact_id, date.today().isoformat(), f"[Reminder] {note}"),
+            )
+        conn.commit(); conn.close()
+        flash(f"Reminder set for {reminder_date}.", "success")
+    elif deal_id and contact_name:
+        # Create an outreach entry with follow-up flag
+        conn.execute(
+            "INSERT INTO outreach (deal_id, contact_name, outreach_date, outreach_summary, "
+            "follow_up_needed, follow_up_date, stage) VALUES (?, ?, ?, ?, 1, ?, 'Initial Email')",
+            (deal_id, contact_name, date.today().isoformat(), note or "Follow-up reminder", reminder_date),
+        )
+        conn.commit(); conn.close()
+        flash(f"Follow-up reminder set for {contact_name}.", "success")
+    else:
+        conn.close()
+        flash("Please select a contact or deal.", "danger")
+
+    next_url = request.form.get("next") or url_for("reminders")
+    return redirect(next_url)
+
+
+@app.route("/reminders/dismiss/<string:kind>/<int:rid>", methods=["POST"])
+def dismiss_reminder(kind, rid):
+    conn = get_db()
+    if kind == "outreach":
+        conn.execute("UPDATE outreach SET follow_up_needed=0, follow_up_date=NULL WHERE id=?", (rid,))
+    elif kind == "contact":
+        conn.execute("UPDATE gp_contacts SET next_contact_date=NULL WHERE id=?", (rid,))
+    conn.commit(); conn.close()
+    flash("Reminder dismissed.", "info")
+    return redirect(request.referrer or url_for("reminders"))
 
 
 with app.app_context():

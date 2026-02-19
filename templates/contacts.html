@@ -3,16 +3,27 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="fw-bold mb-0">GP Contacts</h2>
-  <a href="{{ url_for('new_contact') }}" class="btn btn-primary">
-    <i class="bi bi-plus-lg"></i> Add GP Contact
-  </a>
+  <div>
+    <h2 class="fw-bold mb-0">GP Contacts</h2>
+    <span class="text-muted small">Your investor farming database</span>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-warning fw-semibold btn-sm" data-bs-toggle="modal" data-bs-target="#quickReminderModal">
+      <i class="bi bi-bell me-1"></i>+ Reminder
+    </button>
+    <a href="{{ url_for('new_contact') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Add GP Contact
+    </a>
+  </div>
 </div>
 
 <!-- Search / filter bar -->
-<form method="GET" class="d-flex gap-2 mb-4 flex-wrap">
-  <input type="text" name="q" class="form-control" style="max-width: 320px;"
-         placeholder="Search name, firm, strategy, location…" value="{{ q }}" />
+<form method="GET" class="d-flex gap-2 mb-3 flex-wrap">
+  <div class="input-group" style="max-width:320px;">
+    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+    <input type="text" name="q" class="form-control border-start-0 ps-0"
+           placeholder="Name, firm, strategy, location…" value="{{ q }}" />
+  </div>
   <select name="status" class="form-select" style="max-width: 180px;">
     <option value="">All Statuses</option>
     {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Passed', 'Hot Lead'] %}
@@ -35,11 +46,10 @@
             <th>Name / Title</th>
             <th>Firm</th>
             <th>Strategy</th>
-            <th>AUM Range</th>
-            <th>Location</th>
+            <th>Check Size</th>
             <th>Status</th>
-            <th>Last Contacted</th>
-            <th>Source</th>
+            <th>Last Touched</th>
+            <th>Next Follow-up</th>
             <th></th>
           </tr>
         </thead>
@@ -47,31 +57,38 @@
           {% for c in contacts %}
           <tr>
             <td>
-              <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="text-decoration-none fw-semibold">
-                {{ c.name }}
-              </a>
+              <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="text-decoration-none fw-semibold">{{ c.name }}</a>
               {% if c.title %}<div class="text-muted small">{{ c.title }}</div>{% endif %}
             </td>
             <td>{{ c.company or '—' }}</td>
-            <td>{{ c.strategy or '—' }}</td>
-            <td>{{ c.aum_range or '—' }}</td>
-            <td>{{ c.location or '—' }}</td>
+            <td class="text-muted small">{{ c.strategy or '—' }}</td>
+            <td class="text-muted small">
+              {% if c.min_check or c.max_check %}{{ c.min_check or '' }}{% if c.min_check and c.max_check %}–{% endif %}{{ c.max_check or '' }}
+              {% else %}—{% endif %}
+            </td>
             <td>
-              <span class="badge
-                {% if c.status == 'Hot Lead' %}bg-danger
-                {% elif c.status == 'In Contact' %}bg-primary
-                {% elif c.status == 'Meeting Scheduled' %}bg-success
-                {% elif c.status == 'Passed' %}bg-secondary
-                {% else %}bg-light text-dark border{% endif %}">
-                {{ c.status }}
-              </span>
+              <span class="badge {% if c.status == 'Hot Lead' %}bg-danger{% elif c.status == 'In Contact' %}bg-primary{% elif c.status == 'Meeting Scheduled' %}bg-success{% elif c.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">{{ c.status }}</span>
             </td>
             <td class="text-muted small text-nowrap">{{ c.last_contacted or '—' }}</td>
-            <td class="text-muted small">{{ c.source or '—' }}</td>
+            <td class="text-nowrap">
+              {% if c.next_contact_date %}
+                <span class="badge {% if c.next_contact_date < today %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                  <i class="bi bi-bell-fill me-1"></i>{{ c.next_contact_date }}
+                </span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
             <td>
               <div class="d-flex gap-1">
                 <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
-                <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                <!-- Quick Reminder inline -->
+                <form method="POST" action="{{ url_for('quick_reminder') }}" class="d-flex gap-1">
+                  <input type="hidden" name="contact_id" value="{{ c.id }}">
+                  <input type="hidden" name="next" value="{{ request.url }}">
+                  <input type="date" name="reminder_date" class="form-control form-control-sm" style="width:135px;" required title="Set follow-up date" />
+                  <button type="submit" class="btn btn-sm btn-warning" title="Set reminder"><i class="bi bi-bell"></i></button>
+                </form>
               </div>
             </td>
           </tr>

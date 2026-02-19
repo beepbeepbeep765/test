@@ -1,106 +1,179 @@
 {% extends "base.html" %}
-{% block title %}Emails — ACRE CRM{% endblock %}
+{% block title %}Email Archive — ACRE CRM{% endblock %}
 {% block content %}
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+<div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
   <div>
-    <h4 class="fw-bold mb-0"><i class="bi bi-envelope me-2 text-primary"></i>Sent Email Archive</h4>
+    <h4 class="fw-bold mb-0"><i class="bi bi-envelope me-2 text-primary"></i>Email Archive</h4>
     <small class="text-muted">{{ total }} email{{ 's' if total != 1 }} synced from Outlook</small>
   </div>
-  <form method="POST" action="{{ url_for('sync_emails') }}" class="d-flex align-items-center gap-2">
-    <select name="days" class="form-select form-select-sm" style="width:150px">
+  <!-- Sync Controls -->
+  <form method="POST" action="{{ url_for('sync_emails') }}" class="d-flex align-items-center gap-2 flex-wrap">
+    <select name="days" class="form-select form-select-sm" style="width:140px">
       <option value="30">Last 30 days</option>
       <option value="90" selected>Last 90 days</option>
       <option value="180">Last 6 months</option>
       <option value="365">Last year</option>
     </select>
+    <div class="form-check form-check-inline mb-0 ms-1">
+      <input class="form-check-input" type="checkbox" name="include_inbox" value="1" id="inc_inbox" checked>
+      <label class="form-check-label small" for="inc_inbox">Inbox too</label>
+    </div>
     <button type="submit" class="btn btn-primary btn-sm">
       <i class="bi bi-arrow-clockwise me-1"></i>Sync Outlook
     </button>
   </form>
 </div>
 
-<!-- Search & Filter -->
-<form method="GET" class="row g-2 mb-4">
-  <div class="col-md-7">
-    <div class="input-group">
-      <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-      <input type="text" name="q" class="form-control border-start-0 ps-0"
-             placeholder="Search subject, recipient, or any keyword..." value="{{ q }}" autofocus>
+<!-- Outlook setup callout (shown when no emails) -->
+{% if total == 0 %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down me-2 text-primary"></i>How to connect Outlook</h5>
+    <div class="setup-step">
+      <strong>Step 1.</strong> Open a Command Prompt (<code>Win + R</code> → type <code>cmd</code> → Enter).
+    </div>
+    <div class="setup-step">
+      <strong>Step 2.</strong> Install the Outlook bridge:<br>
+      <code>pip install pywin32</code>
+    </div>
+    <div class="setup-step">
+      <strong>Step 3.</strong> Make sure Outlook is open and logged in.
+    </div>
+    <div class="setup-step">
+      <strong>Step 4.</strong> Click <strong>Sync Outlook</strong> above. The app reads your Sent Items (and optionally Inbox) and imports every email it finds. Works entirely locally — nothing leaves your machine.
+    </div>
+    <div class="alert alert-light border mt-3 mb-0 small">
+      <i class="bi bi-info-circle me-1"></i>
+      Only works on Windows with desktop Outlook. Web-only Outlook accounts are not supported by this method.
     </div>
   </div>
-  <div class="col-md-3">
-    <select name="deal_id" class="form-select">
-      <option value="">All Deals</option>
-      {% for d in deals %}
-        <option value="{{ d.id }}" {% if deal_filter == d.id|string %}selected{% endif %}>{{ d.name }}</option>
-      {% endfor %}
-    </select>
+</div>
+{% endif %}
+
+<!-- Search & Filters -->
+<form method="GET" class="card border-0 shadow-sm p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-md-5">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" name="q" class="form-control border-start-0 ps-0"
+               placeholder="Search subject, body, sender, recipient…" value="{{ q }}" autofocus />
+      </div>
+    </div>
+    <div class="col-md-2">
+      <select name="deal_id" class="form-select">
+        <option value="">All Deals</option>
+        {% for d in deals %}
+          <option value="{{ d.id }}" {% if deal_filter == d.id|string %}selected{% endif %}>{{ d.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="direction" class="form-select">
+        <option value="">Sent + Inbox</option>
+        <option value="sent" {% if direction_filter == 'sent' %}selected{% endif %}>Sent only</option>
+        <option value="received" {% if direction_filter == 'received' %}selected{% endif %}>Inbox only</option>
+      </select>
+    </div>
+    <div class="col-md-1-5">
+      <input type="date" name="date_from" class="form-control" placeholder="From" value="{{ date_from }}" title="From date" />
+    </div>
+    <div class="col-md-1-5">
+      <input type="date" name="date_to" class="form-control" placeholder="To" value="{{ date_to }}" title="To date" />
+    </div>
+    <div class="col-auto d-flex gap-1">
+      <button type="submit" class="btn btn-outline-primary">Search</button>
+      {% if q or deal_filter or direction_filter or date_from or date_to or tag_filter %}
+        <a href="{{ url_for('emails') }}" class="btn btn-outline-secondary">Clear</a>
+      {% endif %}
+    </div>
   </div>
-  <div class="col-auto">
-    <button type="submit" class="btn btn-outline-primary">Search</button>
-    {% if q or deal_filter %}
-      <a href="{{ url_for('emails') }}" class="btn btn-outline-secondary ms-1">Clear</a>
-    {% endif %}
+  <!-- Tag chips -->
+  {% if all_tags %}
+  <div class="d-flex gap-1 mt-2 flex-wrap align-items-center">
+    <span class="text-muted small me-1">Tags:</span>
+    {% for t in all_tags %}
+    <a href="{{ url_for('emails', tag=t) }}" class="badge {% if tag_filter == t %}bg-primary{% else %}bg-light text-dark border{% endif %} text-decoration-none">{{ t }}</a>
+    {% endfor %}
   </div>
+  {% endif %}
 </form>
 
+<!-- Results count -->
 {% if emails %}
-<div class="card shadow-sm">
+<div class="text-muted small mb-2 ps-1">Showing {{ emails|length }} email{{ 's' if emails|length != 1 }}{% if q %} matching <strong>"{{ q }}"</strong>{% endif %}</div>
+{% endif %}
+
+{% if emails %}
+<div class="card border-0 shadow-sm">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
         <tr>
           <th style="width:95px">Date</th>
+          <th style="width:50px"></th>
           <th>Subject</th>
-          <th style="width:220px">To</th>
-          <th style="width:160px">Deal</th>
-          <th style="width:150px">Contact</th>
+          <th style="width:180px">From / To</th>
+          <th style="width:140px">Deal</th>
+          <th style="width:130px">Contact</th>
+          <th style="width:90px">Tags</th>
+          <th style="width:60px"></th>
         </tr>
       </thead>
       <tbody>
         {% for e in emails %}
         <tr>
-          <td class="text-muted small">{{ e.sent_on }}</td>
+          <td class="text-muted small text-nowrap">{{ e.sent_on }}</td>
           <td>
-            <a class="text-decoration-none fw-semibold text-dark"
-               data-bs-toggle="collapse" href="#em-{{ e.id }}" role="button">
+            {% if e.direction == 'received' %}
+              <span class="badge bg-info-subtle text-info-emphasis" title="Received"><i class="bi bi-inbox"></i></span>
+            {% else %}
+              <span class="badge bg-primary-subtle text-primary-emphasis" title="Sent"><i class="bi bi-send"></i></span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('email_detail', email_id=e.id) }}" class="fw-semibold text-decoration-none text-dark">
               {{ e.subject or '(no subject)' }}
             </a>
-            <div class="collapse mt-2" id="em-{{ e.id }}">
-              <div class="card card-body bg-light small py-2"
-                   style="white-space:pre-wrap;max-height:280px;overflow-y:auto;font-family:monospace;">{{ e.body }}</div>
-              <form method="POST" action="{{ url_for('link_email', email_id=e.id) }}"
-                    class="mt-2 d-flex gap-2 align-items-center flex-wrap">
-                <input type="hidden" name="q" value="{{ q }}">
-                <input type="hidden" name="deal_filter" value="{{ deal_filter }}">
-                <label class="small text-muted me-1">Link to deal:</label>
-                <select name="deal_id" class="form-select form-select-sm" style="width:200px">
-                  <option value="">— none —</option>
-                  {% for d in deals %}
-                    <option value="{{ d.id }}" {% if e.deal_id == d.id %}selected{% endif %}>{{ d.name }}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
-              </form>
-            </div>
+            {% if e.body %}
+            <div class="text-muted small text-truncate" style="max-width:400px;">{{ e.body[:120] | replace('\n', ' ') | replace('\r', '') }}</div>
+            {% endif %}
           </td>
-          <td class="small text-muted text-truncate" style="max-width:220px" title="{{ e.to_addr }}">
-            {{ e.to_addr }}
+          <td class="small text-muted">
+            {% if e.direction == 'received' %}
+              <div class="text-truncate" style="max-width:170px;" title="{{ e.from_addr }}">
+                <i class="bi bi-person me-1"></i>{{ e.from_addr or '—' }}
+              </div>
+            {% else %}
+              <div class="text-truncate" style="max-width:170px;" title="{{ e.to_addr }}">
+                <i class="bi bi-arrow-right me-1"></i>{{ e.to_addr or '—' }}
+              </div>
+            {% endif %}
           </td>
           <td>
             {% if e.deal_name %}
-              <span class="badge bg-primary">{{ e.deal_name }}</span>
+              <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" class="badge bg-primary text-decoration-none">{{ e.deal_name }}</a>
             {% else %}
               <span class="text-muted small">—</span>
             {% endif %}
           </td>
           <td>
             {% if e.gp_name %}
-              <span class="badge bg-success">{{ e.gp_name }}</span>
+              <a href="{{ url_for('contact_detail', contact_id=e.contact_id) }}" class="badge bg-success text-decoration-none">{{ e.gp_name }}</a>
             {% else %}
               <span class="text-muted small">—</span>
             {% endif %}
+          </td>
+          <td>
+            {% if e.tags %}
+              {% for t in e.tags.split(',') %}
+                <span class="badge bg-light text-dark border" style="font-size:.65rem;">{{ t.strip() }}</span>
+              {% endfor %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('email_detail', email_id=e.id) }}" class="btn btn-sm btn-outline-secondary py-0">Open</a>
           </td>
         </tr>
         {% endfor %}
@@ -109,18 +182,17 @@
   </div>
 </div>
 
-{% elif q or deal_filter %}
-  <div class="text-center py-5 text-muted">
-    <i class="bi bi-search display-5 d-block mb-2"></i>
-    No emails match your search.
-  </div>
-{% else %}
-  <div class="text-center py-5">
-    <i class="bi bi-envelope-open display-4 text-muted d-block mb-3"></i>
-    <p class="text-muted mb-1">No emails synced yet.</p>
-    <p class="text-muted">Click <strong>Sync Outlook</strong> above to import your sent emails.<br>
-    Make sure Outlook is open on your computer first.</p>
-  </div>
+{% elif q or deal_filter or direction_filter or date_from or date_to or tag_filter %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-search fs-1 d-block mb-2"></i>
+  No emails match your search.
+</div>
+
+{% elif total > 0 %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+  All {{ total }} emails synced. Use the search bar to find anything.
+</div>
 {% endif %}
 
 {% endblock %}

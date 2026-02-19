@@ -2,31 +2,124 @@
 {% block title %}{{ deal.name }}{% endblock %}
 {% block content %}
 
+<!-- Header -->
 <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
   <div class="d-flex align-items-center gap-2">
     <a href="{{ url_for('deals') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
     <div>
       <h2 class="fw-bold mb-0">{{ deal.name }}</h2>
       <span class="text-muted small">
-        {{ deal.asset_type or '' }}{% if deal.asset_type and deal.location %} &middot; {% endif %}{{ deal.location or '' }}{% if deal.target_raise %} &middot; {{ deal.target_raise }}{% endif %}
+        {{ deal.asset_type or '' }}{% if deal.asset_type and deal.location %} &middot; {% endif %}{{ deal.location or '' }}{% if deal.units_sf %} &middot; {{ deal.units_sf }}{% endif %}{% if deal.closing_date %} &middot; Close {{ deal.closing_date }}{% endif %}
       </span>
     </div>
   </div>
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <span class="badge fs-6 {% if deal.status == 'Active' %}bg-success{% elif deal.status == 'Closed' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ deal.status }}</span>
     <a href="{{ url_for('outlook_sync', deal_id=deal.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope-arrow-up me-1"></i>Import from Outlook</a>
-    <a href="{{ url_for('edit_deal', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary">Edit Deal</a>
+    <a href="{{ url_for('edit_deal', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
   </div>
 </div>
 
+<!-- Deal Metrics Strip -->
+{% set has_metrics = deal.purchase_price or deal.target_raise or deal.noi_current or deal.noi_projected or deal.cap_rate or deal.exit_cap_rate or deal.ltv or deal.irr_target or deal.equity_multiple or deal.hold_period %}
+{% if has_metrics %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <div class="row g-0 text-center metric-strip">
+      {% if deal.purchase_price %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.purchase_price }}</div>
+        <div class="metric-lbl">Purchase Price</div>
+      </div>
+      {% endif %}
+      {% if deal.target_raise %}
+      <div class="col metric-item">
+        <div class="metric-val text-primary">{{ deal.target_raise }}</div>
+        <div class="metric-lbl">Equity Raise</div>
+      </div>
+      {% endif %}
+      {% if deal.ltv %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.ltv }}</div>
+        <div class="metric-lbl">LTV</div>
+      </div>
+      {% endif %}
+      {% if deal.noi_current %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.noi_current }}</div>
+        <div class="metric-lbl">Current NOI</div>
+      </div>
+      {% endif %}
+      {% if deal.noi_projected %}
+      <div class="col metric-item">
+        <div class="metric-val text-success">{{ deal.noi_projected }}</div>
+        <div class="metric-lbl">Proj. NOI</div>
+      </div>
+      {% endif %}
+      {% if deal.cap_rate %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.cap_rate }}</div>
+        <div class="metric-lbl">Going-in Cap</div>
+      </div>
+      {% endif %}
+      {% if deal.exit_cap_rate %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.exit_cap_rate }}</div>
+        <div class="metric-lbl">Exit Cap</div>
+      </div>
+      {% endif %}
+      {% if deal.irr_target %}
+      <div class="col metric-item">
+        <div class="metric-val text-warning">{{ deal.irr_target }}</div>
+        <div class="metric-lbl">Target IRR</div>
+      </div>
+      {% endif %}
+      {% if deal.equity_multiple %}
+      <div class="col metric-item">
+        <div class="metric-val text-warning">{{ deal.equity_multiple }}</div>
+        <div class="metric-lbl">EM</div>
+      </div>
+      {% endif %}
+      {% if deal.hold_period %}
+      <div class="col metric-item">
+        <div class="metric-val">{{ deal.hold_period }}</div>
+        <div class="metric-lbl">Hold Period</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if deal.notes %}
-<div class="alert alert-light border mb-4"><strong>Notes:</strong> {{ deal.notes }}</div>
+<div class="alert alert-light border mb-4 small"><strong>Notes:</strong> {{ deal.notes }}</div>
+{% endif %}
+
+<!-- Investor Pipeline Funnel -->
+{% if outreaches %}
+{% set stages = ['Initial Email', 'OM Sent', 'NDA Signed', 'Call / Meeting', 'Deep Dive / DD', 'Soft Circle', 'Hard Commit', 'Passed'] %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-funnel me-2 text-info"></i>Investor Pipeline</h5>
+  </div>
+  <div class="card-body pb-3 pt-2">
+    <div class="d-flex gap-2 flex-wrap pipeline-stages">
+      {% for stage in stages %}
+      {% set count = outreaches | selectattr('stage', 'equalto', stage) | list | length %}
+      <div class="pipeline-stage {% if count > 0 %}pipeline-stage--active{% endif %}">
+        <div class="pipeline-count {% if stage == 'Hard Commit' %}text-success{% elif stage == 'Passed' %}text-secondary{% elif count > 0 %}text-primary{% else %}text-muted{% endif %}">{{ count }}</div>
+        <div class="pipeline-name">{{ stage }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
 {% endif %}
 
 <!-- Outreach Log -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-    <h5 class="mb-0 fw-semibold"><i class="bi bi-send me-2 text-primary"></i>Outreach Log</h5>
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-send me-2 text-primary"></i>Outreach Log <span class="text-muted fw-normal small">({{ outreaches|length }})</span></h5>
     <a href="{{ url_for('new_outreach', deal_id=deal.id) }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Log Outreach</a>
   </div>
   <div class="card-body p-0">
@@ -35,7 +128,7 @@
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Contact</th><th>Company</th><th>Sent By</th><th>Outreach Date</th>
+            <th>Contact</th><th>Stage</th><th>Interest</th><th>Sent By</th><th>Outreach Date</th>
             <th>Our Message</th><th>Response</th><th>Follow-up</th><th></th>
           </tr>
         </thead>
@@ -44,23 +137,30 @@
           <tr {% if o.follow_up_needed %}class="table-warning"{% endif %}>
             <td>
               <div class="fw-semibold">{{ o.contact_name }}</div>
-              {% if o.email %}<div class="text-muted small">{{ o.email }}</div>{% endif %}
+              {% if o.company %}<div class="text-muted small">{{ o.company }}</div>{% endif %}
+              {% if o.email %}<div class="text-muted" style="font-size:.75rem;">{{ o.email }}</div>{% endif %}
             </td>
-            <td>{{ o.company or '—' }}</td>
+            <td>
+              <span class="badge stage-badge stage-{{ (o.stage or 'Initial Email')|lower|replace(' ', '-')|replace('/', '') }}">{{ o.stage or 'Initial Email' }}</span>
+            </td>
+            <td>
+              {% set il = o.interest_level or 'Unknown' %}
+              <span class="badge {% if il == 'Hot' %}bg-danger{% elif il == 'Warm' %}bg-warning text-dark{% elif il == 'Passed' %}bg-secondary{% elif il == 'Interested' %}bg-success{% else %}bg-light text-dark border{% endif %}">{{ il }}</span>
+            </td>
             <td>{% if o.sent_by %}<span class="badge bg-primary-subtle text-primary-emphasis">{{ o.sent_by }}</span>{% else %}—{% endif %}</td>
-            <td class="text-nowrap">{{ o.outreach_date or '—' }}</td>
-            <td><span class="text-truncate-cell" title="{{ o.outreach_summary }}">{{ o.outreach_summary or '—' }}</span></td>
+            <td class="text-nowrap text-muted small">{{ o.outreach_date or '—' }}</td>
+            <td><span class="text-truncate-cell small" title="{{ o.outreach_summary }}">{{ o.outreach_summary or '—' }}</span></td>
             <td>
               {% if o.response_summary %}
-              <span class="text-truncate-cell" title="{{ o.response_summary }}">{{ o.response_summary }}</span>
+              <span class="text-truncate-cell small" title="{{ o.response_summary }}">{{ o.response_summary }}</span>
               {% elif o.response_date %}
               <span class="text-muted small">{{ o.response_date }}</span>
               {% else %}—{% endif %}
             </td>
             <td class="text-center">
               {% if o.follow_up_needed %}
-              <div><span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle"></i> Yes</span></div>
-              {% if o.follow_up_date %}<div class="text-muted" style="font-size:.75rem;">by {{ o.follow_up_date }}</div>{% endif %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle"></i> Yes</span>
+              {% if o.follow_up_date %}<div class="text-muted" style="font-size:.7rem;">by {{ o.follow_up_date }}</div>{% endif %}
               {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td>
@@ -89,7 +189,7 @@
 {% if matching_gps %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white py-3">
-    <h5 class="mb-0 fw-semibold"><i class="bi bi-stars me-2 text-warning"></i>Matching GP Investors</h5>
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-stars me-2 text-warning"></i>Suggested GP Targets</h5>
     <div class="text-muted small mt-1">GPs in your database that match this deal's size and strategy</div>
   </div>
   <div class="card-body p-0">
@@ -115,11 +215,9 @@
               <span class="badge {% if m.gp.status == 'Hot Lead' %}bg-danger{% elif m.gp.status == 'In Contact' %}bg-primary{% elif m.gp.status == 'Meeting Scheduled' %}bg-success{% elif m.gp.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">{{ m.gp.status }}</span>
             </td>
             <td>
-              <div class="d-flex gap-1 flex-wrap">
-                {% for r in m.reasons %}
-                <span class="badge bg-success-subtle text-success-emphasis" style="font-size:.72rem;">{{ r }}</span>
-                {% endfor %}
-              </div>
+              {% for r in m.reasons %}
+              <span class="badge bg-success-subtle text-success-emphasis me-1" style="font-size:.7rem;">{{ r }}</span>
+              {% endfor %}
             </td>
             <td>
               <a href="{{ url_for('contact_detail', contact_id=m.gp.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
@@ -132,7 +230,7 @@
   </div>
 </div>
 {% elif deal.target_raise or deal.asset_type %}
-<div class="alert alert-light border text-muted">
+<div class="alert alert-light border text-muted small">
   <i class="bi bi-info-circle me-2"></i>No GP matches found yet. Add GP contacts with check sizes and strategies to see investor matches here.
 </div>
 {% endif %}

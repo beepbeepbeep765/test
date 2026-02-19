@@ -7,36 +7,31 @@
   <h2 class="fw-bold mb-0">{{ title }}</h2>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width: 640px;">
+<div class="card border-0 shadow-sm" style="max-width: 760px;">
   <div class="card-body p-4">
     <form method="POST">
+
+      <!-- Core Info -->
+      <div class="section-label">Deal Info</div>
       <div class="mb-3">
         <label class="form-label fw-semibold">Deal Name <span class="text-danger">*</span></label>
         <input type="text" name="name" class="form-control" required
                value="{{ deal.name if deal else '' }}" placeholder="e.g. Parkview Multifamily Portfolio" />
       </div>
       <div class="row g-3 mb-3">
-        <div class="col-sm-6">
+        <div class="col-sm-4">
           <label class="form-label fw-semibold">Asset Type</label>
           <input type="text" name="asset_type" class="form-control"
                  value="{{ deal.asset_type if deal else '' }}"
-                 placeholder="e.g. Multifamily, Office, Industrial" />
+                 placeholder="Multifamily, Office, Industrial…" />
         </div>
-        <div class="col-sm-6">
+        <div class="col-sm-4">
           <label class="form-label fw-semibold">Location</label>
           <input type="text" name="location" class="form-control"
                  value="{{ deal.location if deal else '' }}"
-                 placeholder="e.g. Atlanta, GA" />
+                 placeholder="Atlanta, GA" />
         </div>
-      </div>
-      <div class="row g-3 mb-3">
-        <div class="col-sm-6">
-          <label class="form-label fw-semibold">Target Raise</label>
-          <input type="text" name="target_raise" class="form-control"
-                 value="{{ deal.target_raise if deal else '' }}"
-                 placeholder="e.g. $25M" />
-        </div>
-        <div class="col-sm-6">
+        <div class="col-sm-4">
           <label class="form-label fw-semibold">Status</label>
           <select name="status" class="form-select">
             {% for s in ['Active', 'On Hold', 'Closed', 'Dead'] %}
@@ -44,12 +39,86 @@
             {% endfor %}
           </select>
         </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Units / SF</label>
+          <input type="text" name="units_sf" class="form-control"
+                 value="{{ deal.units_sf if deal else '' }}"
+                 placeholder="e.g. 240 units or 85,000 SF" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Expected Closing</label>
+          <input type="date" name="closing_date" class="form-control"
+                 value="{{ deal.closing_date if deal else '' }}" />
+        </div>
       </div>
+
+      <!-- Deal Economics -->
+      <div class="section-label mt-4">Deal Economics</div>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Purchase Price</label>
+          <input type="text" name="purchase_price" class="form-control"
+                 value="{{ deal.purchase_price if deal else '' }}" placeholder="e.g. $42M" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Target Equity Raise</label>
+          <input type="text" name="target_raise" class="form-control"
+                 value="{{ deal.target_raise if deal else '' }}" placeholder="e.g. $15M" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">LTV</label>
+          <input type="text" name="ltv" class="form-control"
+                 value="{{ deal.ltv if deal else '' }}" placeholder="e.g. 65%" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Current NOI</label>
+          <input type="text" name="noi_current" class="form-control"
+                 value="{{ deal.noi_current if deal else '' }}" placeholder="e.g. $2.1M" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Projected NOI (Yr 1 Stab.)</label>
+          <input type="text" name="noi_projected" class="form-control"
+                 value="{{ deal.noi_projected if deal else '' }}" placeholder="e.g. $2.8M" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Going-in Cap Rate</label>
+          <input type="text" name="cap_rate" class="form-control"
+                 value="{{ deal.cap_rate if deal else '' }}" placeholder="e.g. 5.0%" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Exit Cap Rate</label>
+          <input type="text" name="exit_cap_rate" class="form-control"
+                 value="{{ deal.exit_cap_rate if deal else '' }}" placeholder="e.g. 5.5%" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Hold Period</label>
+          <input type="text" name="hold_period" class="form-control"
+                 value="{{ deal.hold_period if deal else '' }}" placeholder="e.g. 5 years" />
+        </div>
+      </div>
+
+      <!-- Return Targets -->
+      <div class="section-label mt-4">Return Targets</div>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Target IRR</label>
+          <input type="text" name="irr_target" class="form-control"
+                 value="{{ deal.irr_target if deal else '' }}" placeholder="e.g. 18%" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Equity Multiple</label>
+          <input type="text" name="equity_multiple" class="form-control"
+                 value="{{ deal.equity_multiple if deal else '' }}" placeholder="e.g. 2.0x" />
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="section-label mt-4">Notes</div>
       <div class="mb-4">
-        <label class="form-label fw-semibold">Notes</label>
         <textarea name="notes" class="form-control" rows="3"
-                  placeholder="Deal summary, key terms, strategy...">{{ deal.notes if deal else '' }}</textarea>
+                  placeholder="Deal thesis, key risks, strategy highlights, broker info…">{{ deal.notes if deal else '' }}</textarea>
       </div>
+
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">Save Deal</button>
         <a href="{{ url_for('deals') }}" class="btn btn-outline-secondary">Cancel</a>
