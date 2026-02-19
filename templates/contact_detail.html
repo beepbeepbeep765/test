@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ contact.name }} — ACRe CRM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('contacts') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h2 class="fw-bold mb-0">{{ contact.name }}</h2>
+      {% if contact.title %}<div class="text-muted">{{ contact.title }}{% if contact.company %} at {{ contact.company }}{% endif %}</div>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('edit_contact', contact_id=contact.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Contact Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}</dd>
+
+          <dt class="col-5 text-muted">Phone</dt>
+          <dd class="col-7">{{ contact.phone or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Company</dt>
+          <dd class="col-7">{{ contact.company or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Location</dt>
+          <dd class="col-7">{{ contact.location or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Status</dt>
+          <dd class="col-7">
+            <span class="badge
+              {% if contact.status == 'Hot Lead' %}bg-danger
+              {% elif contact.status == 'In Contact' %}bg-primary
+              {% elif contact.status == 'Meeting Scheduled' %}bg-success
+              {% elif contact.status == 'Passed' %}bg-secondary
+              {% else %}bg-light text-dark border{% endif %}">
+              {{ contact.status }}
+            </span>
+          </dd>
+
+          <dt class="col-5 text-muted">Last Contacted</dt>
+          <dd class="col-7">{{ contact.last_contacted or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Source</dt>
+          <dd class="col-7">{{ contact.source or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Investment Profile</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Strategy</dt>
+          <dd class="col-7">{{ contact.strategy or '—' }}</dd>
+
+          <dt class="col-5 text-muted">AUM Range</dt>
+          <dd class="col-7">{{ contact.aum_range or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Min Check Size</dt>
+          <dd class="col-7">{{ contact.min_check or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Max Check Size</dt>
+          <dd class="col-7">{{ contact.max_check or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  {% if contact.notes %}
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold py-3">Notes</div>
+      <div class="card-body">{{ contact.notes }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

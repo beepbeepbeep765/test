@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — ACRe CRM{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('deals') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="fw-bold mb-0">{{ title }}</h2>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width: 640px;">
+  <div class="card-body p-4">
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Deal Name <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" required
+               value="{{ deal.name if deal else '' }}" placeholder="e.g. Parkview Multifamily Portfolio" />
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Asset Type</label>
+          <input type="text" name="asset_type" class="form-control"
+                 value="{{ deal.asset_type if deal else '' }}"
+                 placeholder="e.g. Multifamily, Office, Industrial" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Location</label>
+          <input type="text" name="location" class="form-control"
+                 value="{{ deal.location if deal else '' }}"
+                 placeholder="e.g. Atlanta, GA" />
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Target Raise</label>
+          <input type="text" name="target_raise" class="form-control"
+                 value="{{ deal.target_raise if deal else '' }}"
+                 placeholder="e.g. $25M" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['Active', 'On Hold', 'Closed', 'Dead'] %}
+            <option value="{{ s }}" {% if deal and deal.status == s %}selected{% elif not deal and s == 'Active' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Notes</label>
+        <textarea name="notes" class="form-control" rows="3"
+                  placeholder="Deal summary, key terms, strategy...">{{ deal.notes if deal else '' }}</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save Deal</button>
+        <a href="{{ url_for('deals') }}" class="btn btn-outline-secondary">Cancel</a>
+        {% if deal %}
+        <form method="POST" action="{{ url_for('delete_deal', deal_id=deal.id) }}" class="ms-auto"
+              onsubmit="return confirm('Delete this deal and all its outreach logs?')">
+          <button type="submit" class="btn btn-outline-danger">Delete Deal</button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
