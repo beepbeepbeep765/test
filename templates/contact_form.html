@@ -1,40 +1,31 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} — ACRe CRM{% endblock %}
-
+{% block title %}{{ title }}{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center gap-2 mb-4">
   <a href="{{ url_for('contacts') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
   <h2 class="fw-bold mb-0">{{ title }}</h2>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width: 720px;">
+<div class="card border-0 shadow-sm" style="max-width:720px;">
   <div class="card-body p-4">
     <form method="POST">
-
       <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Person</h6>
       <div class="row g-3 mb-3">
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
-          <input type="text" name="name" class="form-control" required
-                 value="{{ contact.name if contact else '' }}" placeholder="John Doe" />
+          <input type="text" name="name" class="form-control" required value="{{ contact.name if contact else '' }}" placeholder="John Doe" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Title</label>
-          <input type="text" name="title" class="form-control"
-                 value="{{ contact.title if contact else '' }}"
-                 placeholder="Managing Partner" />
+          <input type="text" name="title" class="form-control" value="{{ contact.title if contact else '' }}" placeholder="Managing Partner" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Email</label>
-          <input type="email" name="email" class="form-control"
-                 value="{{ contact.email if contact else '' }}"
-                 placeholder="john@firm.com" />
+          <input type="email" name="email" class="form-control" value="{{ contact.email if contact else '' }}" placeholder="john@firm.com" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Phone</label>
-          <input type="text" name="phone" class="form-control"
-                 value="{{ contact.phone if contact else '' }}"
-                 placeholder="(212) 555-0100" />
+          <input type="text" name="phone" class="form-control" value="{{ contact.phone if contact else '' }}" placeholder="(212) 555-0100" />
         </div>
       </div>
 
@@ -43,39 +34,27 @@
       <div class="row g-3 mb-3">
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Company / Firm</label>
-          <input type="text" name="company" class="form-control"
-                 value="{{ contact.company if contact else '' }}"
-                 placeholder="Apex Capital Partners" />
+          <input type="text" name="company" class="form-control" value="{{ contact.company if contact else '' }}" placeholder="Apex Capital Partners" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Location</label>
-          <input type="text" name="location" class="form-control"
-                 value="{{ contact.location if contact else '' }}"
-                 placeholder="Dallas, TX" />
+          <input type="text" name="location" class="form-control" value="{{ contact.location if contact else '' }}" placeholder="Dallas, TX" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">AUM Range</label>
-          <input type="text" name="aum_range" class="form-control"
-                 value="{{ contact.aum_range if contact else '' }}"
-                 placeholder="$100M–$500M" />
+          <input type="text" name="aum_range" class="form-control" value="{{ contact.aum_range if contact else '' }}" placeholder="$100M–$500M" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Strategy / Asset Focus</label>
-          <input type="text" name="strategy" class="form-control"
-                 value="{{ contact.strategy if contact else '' }}"
-                 placeholder="Value-add multifamily, Sun Belt" />
+          <input type="text" name="strategy" class="form-control" value="{{ contact.strategy if contact else '' }}" placeholder="Value-add multifamily, Sun Belt" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Min Check Size</label>
-          <input type="text" name="min_check" class="form-control"
-                 value="{{ contact.min_check if contact else '' }}"
-                 placeholder="$5M" />
+          <input type="text" name="min_check" class="form-control" value="{{ contact.min_check if contact else '' }}" placeholder="$5M" />
         </div>
         <div class="col-sm-6">
           <label class="form-label fw-semibold">Max Check Size</label>
-          <input type="text" name="max_check" class="form-control"
-                 value="{{ contact.max_check if contact else '' }}"
-                 placeholder="$25M" />
+          <input type="text" name="max_check" class="form-control" value="{{ contact.max_check if contact else '' }}" placeholder="$25M" />
         </div>
       </div>
 
@@ -92,19 +71,20 @@
         </div>
         <div class="col-sm-4">
           <label class="form-label fw-semibold">Last Contacted</label>
-          <input type="date" name="last_contacted" class="form-control"
-                 value="{{ contact.last_contacted if contact else '' }}" />
+          <input type="date" name="last_contacted" class="form-control" value="{{ contact.last_contacted if contact else '' }}" />
         </div>
         <div class="col-sm-4">
+          <label class="form-label fw-semibold">Next Contact Reminder</label>
+          <input type="date" name="next_contact_date" class="form-control" value="{{ contact.next_contact_date if contact else '' }}" />
+          <div class="form-text">Shows on dashboard when overdue.</div>
+        </div>
+        <div class="col-sm-6">
           <label class="form-label fw-semibold">Source</label>
-          <input type="text" name="source" class="form-control"
-                 value="{{ contact.source if contact else '' }}"
-                 placeholder="LinkedIn, referral, conf…" />
+          <input type="text" name="source" class="form-control" value="{{ contact.source if contact else '' }}" placeholder="LinkedIn, referral, conf…" />
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">Notes</label>
-          <textarea name="notes" class="form-control" rows="3"
-                    placeholder="Anything useful — relationship notes, deal fit, who referred them…">{{ contact.notes if contact else '' }}</textarea>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Relationship notes, deal fit, who referred them…">{{ contact.notes if contact else '' }}</textarea>
         </div>
       </div>
 

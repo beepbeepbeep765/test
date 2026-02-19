@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ contact.name }} — ACRe CRM{% endblock %}
-
+{% block title %}{{ contact.name }}{% endblock %}
 {% block content %}
+
 <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
   <div class="d-flex align-items-center gap-2">
     <a href="{{ url_for('contacts') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
@@ -10,12 +10,10 @@
       {% if contact.title %}<div class="text-muted">{{ contact.title }}{% if contact.company %} at {{ contact.company }}{% endif %}</div>{% endif %}
     </div>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('edit_contact', contact_id=contact.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-  </div>
+  <a href="{{ url_for('edit_contact', contact_id=contact.id) }}" class="btn btn-sm btn-outline-primary">Edit Contact</a>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 mb-4">
   <div class="col-md-6">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-header bg-white fw-semibold py-3">Contact Details</div>
@@ -23,31 +21,24 @@
         <dl class="row mb-0">
           <dt class="col-5 text-muted">Email</dt>
           <dd class="col-7">{% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}</dd>
-
           <dt class="col-5 text-muted">Phone</dt>
           <dd class="col-7">{{ contact.phone or '—' }}</dd>
-
           <dt class="col-5 text-muted">Company</dt>
           <dd class="col-7">{{ contact.company or '—' }}</dd>
-
           <dt class="col-5 text-muted">Location</dt>
           <dd class="col-7">{{ contact.location or '—' }}</dd>
-
           <dt class="col-5 text-muted">Status</dt>
           <dd class="col-7">
-            <span class="badge
-              {% if contact.status == 'Hot Lead' %}bg-danger
-              {% elif contact.status == 'In Contact' %}bg-primary
-              {% elif contact.status == 'Meeting Scheduled' %}bg-success
-              {% elif contact.status == 'Passed' %}bg-secondary
-              {% else %}bg-light text-dark border{% endif %}">
+            <span class="badge {% if contact.status == 'Hot Lead' %}bg-danger{% elif contact.status == 'In Contact' %}bg-primary{% elif contact.status == 'Meeting Scheduled' %}bg-success{% elif contact.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
               {{ contact.status }}
             </span>
           </dd>
-
           <dt class="col-5 text-muted">Last Contacted</dt>
           <dd class="col-7">{{ contact.last_contacted or '—' }}</dd>
-
+          {% if contact.next_contact_date %}
+          <dt class="col-5 text-muted">Next Contact</dt>
+          <dd class="col-7"><span class="badge bg-warning text-dark">{{ contact.next_contact_date }}</span></dd>
+          {% endif %}
           <dt class="col-5 text-muted">Source</dt>
           <dd class="col-7">{{ contact.source or '—' }}</dd>
         </dl>
@@ -62,27 +53,64 @@
         <dl class="row mb-0">
           <dt class="col-5 text-muted">Strategy</dt>
           <dd class="col-7">{{ contact.strategy or '—' }}</dd>
-
           <dt class="col-5 text-muted">AUM Range</dt>
           <dd class="col-7">{{ contact.aum_range or '—' }}</dd>
-
           <dt class="col-5 text-muted">Min Check Size</dt>
           <dd class="col-7">{{ contact.min_check or '—' }}</dd>
-
           <dt class="col-5 text-muted">Max Check Size</dt>
           <dd class="col-7">{{ contact.max_check or '—' }}</dd>
         </dl>
+        {% if contact.notes %}
+        <hr />
+        <div class="text-muted small fw-semibold mb-1">Notes</div>
+        <div style="white-space:pre-wrap;">{{ contact.notes }}</div>
+        {% endif %}
       </div>
     </div>
   </div>
-
-  {% if contact.notes %}
-  <div class="col-12">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold py-3">Notes</div>
-      <div class="card-body">{{ contact.notes }}</div>
-    </div>
-  </div>
-  {% endif %}
 </div>
+
+<!-- Quick Notes -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-journal-text me-2 text-primary"></i>Call & Meeting Notes</h5>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('add_contact_note', contact_id=contact.id) }}" class="mb-4">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold small">Date</label>
+          <input type="date" name="note_date" class="form-control form-control-sm" />
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold small">Note</label>
+          <input type="text" name="note_text" class="form-control form-control-sm" placeholder="Quick note — call outcome, what they said, next steps..." required />
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Add Note</button>
+        </div>
+      </div>
+    </form>
+
+    {% if notes %}
+    <ul class="list-group list-group-flush">
+      {% for n in notes %}
+      <li class="list-group-item px-0 d-flex align-items-start justify-content-between gap-3">
+        <div class="d-flex gap-3">
+          <span class="text-muted small text-nowrap">{{ n.note_date or '—' }}</span>
+          <span>{{ n.note_text }}</span>
+        </div>
+        <form method="POST" action="{{ url_for('delete_contact_note', contact_id=contact.id, note_id=n.id) }}"
+              onsubmit="return confirm('Delete this note?')" class="flex-shrink-0">
+          <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">No notes yet. Add one above after a call or meeting.</p>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

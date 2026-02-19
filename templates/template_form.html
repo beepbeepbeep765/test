@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('templates') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="fw-bold mb-0">{{ title }}</h2>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:720px;">
+  <div class="card-body p-4">
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Template Name <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" required value="{{ template.name if template else '' }}" placeholder="e.g. Initial Deal Introduction" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Subject Line</label>
+        <input type="text" name="subject" class="form-control" value="{{ template.subject if template else '' }}" placeholder="e.g. Introduction: [DEAL NAME]" />
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Body <span class="text-danger">*</span></label>
+        <textarea name="body" class="form-control" rows="14" required
+                  placeholder="Write your template here. Use [DEAL NAME], [CONTACT NAME], [YOUR NAME] as placeholders.">{{ template.body if template else '' }}</textarea>
+        <div class="form-text">Tip: use [DEAL NAME], [CONTACT NAME], [ASSET TYPE], [LOCATION], [TARGET RAISE], [YOUR NAME] as fill-in placeholders.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save Template</button>
+        <a href="{{ url_for('templates') }}" class="btn btn-outline-secondary">Cancel</a>
+        {% if template %}
+        <form method="POST" action="{{ url_for('delete_template', template_id=template.id) }}"
+              class="ms-auto" onsubmit="return confirm('Delete this template?')">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

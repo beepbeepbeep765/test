@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Import from Outlook — {{ deal.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('deal_detail', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <div>
+    <h2 class="fw-bold mb-0">Import from Outlook</h2>
+    <span class="text-muted small">Deal: {{ deal.name }}</span>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" style="max-width:640px;">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-envelope-arrow-up me-2 text-primary"></i>Search Your Sent Emails</h5>
+  </div>
+  <div class="card-body p-4">
+    <p class="text-muted small mb-3">Enter the email address of someone you emailed about this deal. The app will pull matching sent emails from Outlook so you can log them as outreach — no auto-responses, just reading your sent items.</p>
+    <form method="POST">
+      <div class="row g-3 mb-3">
+        <div class="col-sm-7">
+          <label class="form-label fw-semibold">Contact Email Address</label>
+          <input type="email" name="search_email" class="form-control" required
+                 value="{{ search_email }}" placeholder="investor@firm.com" />
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label fw-semibold">Look Back</label>
+          <select name="days" class="form-select">
+            <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+            <option value="60" {% if days == 60 %}selected{% endif %}>60 days</option>
+            <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+            <option value="180" {% if days == 180 %}selected{% endif %}>6 months</option>
+          </select>
+        </div>
+        <div class="col-sm-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">Search</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
+{% endif %}
+
+{% if emails %}
+<h5 class="fw-semibold mb-3">{{ emails|length }} email{{ 's' if emails|length != 1 }} found — click Log to add as outreach</h5>
+<div class="d-flex flex-column gap-3">
+  {% for e in emails %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-3">
+      <div class="d-flex justify-content-between align-items-start gap-3">
+        <div class="flex-grow-1">
+          <div class="fw-semibold">{{ e.subject }}</div>
+          <div class="text-muted small mb-2">To: {{ e.to }} &nbsp;·&nbsp; Sent: {{ e.sent_on }}</div>
+          <div class="text-muted small" style="font-style:italic;">{{ e.preview }}{% if e.preview|length >= 400 %}…{% endif %}</div>
+        </div>
+        <div class="flex-shrink-0">
+          <button class="btn btn-sm btn-outline-primary" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#log-{{ loop.index }}">
+            Log This
+          </button>
+        </div>
+      </div>
+
+      <div class="collapse mt-3" id="log-{{ loop.index }}">
+        <form method="POST" action="{{ url_for('outlook_import', deal_id=deal.id) }}">
+          <input type="hidden" name="outreach_date" value="{{ e.sent_on }}" />
+          <input type="hidden" name="outreach_summary" value="{{ e.subject }}" />
+          <div class="row g-2 mt-1">
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Contact Name <span class="text-danger">*</span></label>
+              <input type="text" name="contact_name" class="form-control form-control-sm" required placeholder="Jane Smith" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Company</label>
+              <input type="text" name="company" class="form-control form-control-sm" placeholder="Firm name" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Their Email</label>
+              <input type="email" name="email" class="form-control form-control-sm" value="{{ search_email }}" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small fw-semibold">Sent By</label>
+              <input type="text" name="sent_by" class="form-control form-control-sm" placeholder="Your name" />
+            </div>
+            <div class="col-12 mt-2">
+              <button type="submit" class="btn btn-sm btn-success">Save as Outreach Entry</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% elif search_email and not error %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-2"></i>No sent emails to <strong>{{ search_email }}</strong> found in the last {{ days }} days.
+</div>
+{% endif %}
+
+{% endblock %}

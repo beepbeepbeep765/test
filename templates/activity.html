@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Activity Log{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0">Activity Log</h2>
+  <span class="text-muted small">All outreach across all deals</span>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if entries %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th><th>Deal</th><th>Contact</th><th>Company</th>
+            <th>Sent By</th><th>What We Said</th><th>Their Reply</th><th>Follow-up</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr {% if e.follow_up_needed %}class="table-warning"{% endif %}>
+            <td class="text-nowrap text-muted small">{{ e.outreach_date or '—' }}</td>
+            <td>
+              <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" class="fw-semibold text-decoration-none">{{ e.deal_name }}</a>
+            </td>
+            <td>
+              <div class="fw-semibold">{{ e.contact_name }}</div>
+              {% if e.email %}<div class="text-muted small">{{ e.email }}</div>{% endif %}
+            </td>
+            <td class="text-muted small">{{ e.company or '—' }}</td>
+            <td>
+              {% if e.sent_by %}<span class="badge bg-primary-subtle text-primary-emphasis">{{ e.sent_by }}</span>{% else %}—{% endif %}
+            </td>
+            <td><span class="text-truncate-cell" title="{{ e.outreach_summary }}">{{ e.outreach_summary or '—' }}</span></td>
+            <td><span class="text-truncate-cell" title="{{ e.response_summary }}">{{ e.response_summary or '—' }}</span></td>
+            <td class="text-center">
+              {% if e.follow_up_needed %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle"></i>
+                {% if e.follow_up_date %}{{ e.follow_up_date }}{% else %}Yes{% endif %}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-3 py-2 text-muted small border-top">{{ entries|length }} entr{{ 'ies' if entries|length != 1 else 'y' }}</div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-activity fs-1 d-block mb-2"></i>
+      No activity yet. Log outreach on a deal to see it here.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

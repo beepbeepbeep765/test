@@ -1,64 +1,46 @@
 body {
-  background-color: #f5f6fa;
+  background-color: #f0f2f8;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.navbar-brand {
-  font-size: 1.2rem;
-  letter-spacing: 0.5px;
-}
-
 /* Stat cards */
-.stat-card .card-body {
-  padding: 1.25rem;
-}
-.stat-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.4rem;
-}
-.stat-value {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 0.2rem;
-}
-.stat-label {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #6c757d;
+.stat-card .card-body { padding: 1.4rem 1.25rem; }
+.stat-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+.stat-value { font-size: 2.2rem; font-weight: 700; line-height: 1; margin-bottom: 0.2rem; }
+.stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: #8892a4; }
+
+/* Activity dot */
+.activity-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
 }
 
-/* Table text truncation in deal detail */
+/* Cards */
+.card { border-radius: 10px; }
+.card-header { border-bottom: 1px solid rgba(0,0,0,.07); }
+
+/* Text truncation */
 .text-truncate-cell {
-  display: inline-block;
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-  cursor: default;
+  display: inline-block; max-width: 200px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; vertical-align: middle; cursor: default;
 }
 
-/* Card headers */
-.card-header {
-  border-bottom: 1px solid rgba(0,0,0,.08);
+/* Forms */
+.form-control:focus, .form-select:focus {
+  border-color: #4e73df;
+  box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.15);
 }
 
-/* Form focus */
-.form-control:focus,
-.form-select:focus {
-  border-color: #0d6efd;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
-}
+/* Tables */
+.table td, .table th { vertical-align: middle; font-size: 0.875rem; }
+.table thead th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
 
-/* Slightly tighter table rows */
-.table td, .table th {
-  vertical-align: middle;
-  font-size: 0.9rem;
-}
+/* Alerts */
+.alert { border-radius: 8px; }
 
-/* Alert tweaks */
-.alert {
-  border-radius: 8px;
-}
+/* Navbar */
+.navbar .nav-link { font-size: 0.9rem; transition: background .15s; }
+.navbar .nav-link:hover { background: rgba(255,255,255,.08); }
+.navbar-brand { font-size: 1.1rem; }
+
+/* Pre in template cards */
+pre { background: transparent; }

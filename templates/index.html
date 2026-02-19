@@ -1,20 +1,56 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — ACRe CRM{% endblock %}
-
+{% block title %}Dashboard{% endblock %}
 {% block content %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="fw-bold mb-0">Dashboard</h2>
-  <span class="text-muted small">ACRe Solutions Capital Markets</span>
+  <div>
+    <h2 class="fw-bold mb-0">Dashboard</h2>
+    <span class="text-muted small">Capital Markets Deal Tracker</span>
+  </div>
+  <a href="{{ url_for('new_deal') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Deal</a>
 </div>
 
-<!-- Stats row -->
+<!-- Reminders / Alerts -->
+{% set total_overdue = overdue_outreach|length + overdue_contacts|length %}
+{% if total_overdue > 0 %}
+<div class="card border-0 shadow-sm mb-4" style="border-left: 4px solid #dc3545 !important;">
+  <div class="card-body py-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-bell-fill text-danger"></i>
+      <strong class="text-danger">{{ total_overdue }} Overdue Reminder{{ 's' if total_overdue != 1 }}</strong>
+    </div>
+    {% for o in overdue_outreach %}
+    <div class="d-flex align-items-center justify-content-between py-1 border-bottom">
+      <div>
+        <span class="badge bg-danger me-2">{{ o.follow_up_date }}</span>
+        <a href="{{ url_for('deal_detail', deal_id=o.deal_id) }}" class="fw-semibold text-decoration-none">{{ o.deal_name }}</a>
+        <span class="text-muted"> — follow up with </span>{{ o.contact_name }}{% if o.company %} ({{ o.company }}){% endif %}
+      </div>
+      <a href="{{ url_for('edit_outreach', deal_id=o.deal_id, outreach_id=o.id) }}" class="btn btn-sm btn-outline-danger">Update</a>
+    </div>
+    {% endfor %}
+    {% for c in overdue_contacts %}
+    <div class="d-flex align-items-center justify-content-between py-1 border-bottom">
+      <div>
+        <span class="badge bg-warning text-dark me-2">{{ c.next_contact_date }}</span>
+        <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+        {% if c.company %}<span class="text-muted"> — {{ c.company }}</span>{% endif %}
+      </div>
+      <a href="{{ url_for('edit_contact', contact_id=c.id) }}" class="btn btn-sm btn-outline-warning">Update</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Stats -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card stat-card border-0 shadow-sm h-100">
       <div class="card-body">
         <div class="stat-icon text-primary"><i class="bi bi-building"></i></div>
-        <div class="stat-value">{{ deals|length }}</div>
-        <div class="stat-label">Active Deals</div>
+        <div class="stat-value text-primary">{{ deals|length }}</div>
+        <div class="stat-label">Deals Tracked</div>
       </div>
     </div>
   </div>
@@ -22,7 +58,7 @@
     <div class="card stat-card border-0 shadow-sm h-100">
       <div class="card-body">
         <div class="stat-icon text-success"><i class="bi bi-send"></i></div>
-        <div class="stat-value">{{ deals|sum(attribute='outreach_count') }}</div>
+        <div class="stat-value text-success">{{ deals|sum(attribute='outreach_count') }}</div>
         <div class="stat-label">Total Outreaches</div>
       </div>
     </div>
@@ -30,9 +66,9 @@
   <div class="col-6 col-md-3">
     <div class="card stat-card border-0 shadow-sm h-100">
       <div class="card-body">
-        <div class="stat-icon text-warning"><i class="bi bi-exclamation-circle"></i></div>
-        <div class="stat-value">{{ pending_followups }}</div>
-        <div class="stat-label">Follow-ups Needed</div>
+        <div class="stat-icon {% if pending_followups > 0 %}text-danger{% else %}text-secondary{% endif %}"><i class="bi bi-exclamation-circle"></i></div>
+        <div class="stat-value {% if pending_followups > 0 %}text-danger{% else %}text-secondary{% endif %}">{{ pending_followups }}</div>
+        <div class="stat-label">Follow-ups Pending</div>
       </div>
     </div>
   </div>
@@ -40,63 +76,92 @@
     <div class="card stat-card border-0 shadow-sm h-100">
       <div class="card-body">
         <div class="stat-icon text-info"><i class="bi bi-people"></i></div>
-        <div class="stat-value">{{ gp_count }}</div>
+        <div class="stat-value text-info">{{ gp_count }}</div>
         <div class="stat-label">GP Contacts</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Active Deals -->
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-    <h5 class="mb-0 fw-semibold">Active Deals</h5>
-    <a href="{{ url_for('new_deal') }}" class="btn btn-sm btn-primary">
-      <i class="bi bi-plus-lg"></i> New Deal
-    </a>
+<div class="row g-4">
+  <!-- Active Deals -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-building me-2 text-primary"></i>Deals</h5>
+        <a href="{{ url_for('deals') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body p-0">
+        {% if deals %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr><th>Deal</th><th>Status</th><th class="text-center">Outreaches</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for d in deals %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('deal_detail', deal_id=d.id) }}" class="fw-semibold text-decoration-none">{{ d.name }}</a>
+                  <div class="text-muted small">{{ d.asset_type or '' }}{% if d.asset_type and d.location %} · {% endif %}{{ d.location or '' }}{% if d.target_raise %} · {{ d.target_raise }}{% endif %}</div>
+                </td>
+                <td>
+                  <span class="badge {% if d.status == 'Active' %}bg-success{% elif d.status == 'Closed' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ d.status }}</span>
+                </td>
+                <td class="text-center fw-semibold">{{ d.outreach_count }}</td>
+                <td><a href="{{ url_for('deal_detail', deal_id=d.id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-building fs-1 d-block mb-2"></i>
+          No deals yet. <a href="{{ url_for('new_deal') }}">Add your first.</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
-  <div class="card-body p-0">
-    {% if deals %}
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Deal</th>
-            <th>Type</th>
-            <th>Location</th>
-            <th>Target Raise</th>
-            <th>Status</th>
-            <th class="text-center">Outreaches</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for d in deals %}
-          <tr>
-            <td class="fw-semibold"><a href="{{ url_for('deal_detail', deal_id=d.id) }}" class="text-decoration-none">{{ d.name }}</a></td>
-            <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ d.asset_type or '—' }}</span></td>
-            <td class="text-muted">{{ d.location or '—' }}</td>
-            <td>{{ d.target_raise or '—' }}</td>
-            <td>
-              <span class="badge {% if d.status == 'Active' %}bg-success{% elif d.status == 'Closed' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
-                {{ d.status }}
-              </span>
-            </td>
-            <td class="text-center">{{ d.outreach_count }}</td>
-            <td>
-              <a href="{{ url_for('deal_detail', deal_id=d.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
-            </td>
-          </tr>
+
+  <!-- Recent Activity -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-activity me-2 text-success"></i>Recent Activity</h5>
+        <a href="{{ url_for('activity') }}" class="btn btn-sm btn-outline-secondary">Full Log</a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_activity %}
+        <ul class="list-group list-group-flush">
+          {% for e in recent_activity %}
+          <li class="list-group-item px-3 py-2">
+            <div class="d-flex align-items-start gap-2">
+              <div class="activity-dot {% if e.follow_up_needed %}bg-warning{% else %}bg-success{% endif %} mt-1"></div>
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="fw-semibold text-truncate">{{ e.contact_name }}{% if e.company %} <span class="fw-normal text-muted">· {{ e.company }}</span>{% endif %}</div>
+                <div class="text-muted small">
+                  <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" class="text-decoration-none text-muted">{{ e.deal_name }}</a>
+                  {% if e.outreach_date %} · {{ e.outreach_date }}{% endif %}
+                </div>
+                {% if e.follow_up_needed %}
+                <span class="badge bg-warning text-dark mt-1" style="font-size:.7rem;">follow-up needed</span>
+                {% endif %}
+              </div>
+            </div>
+          </li>
           {% endfor %}
-        </tbody>
-      </table>
+        </ul>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-activity fs-1 d-block mb-2"></i>
+          No activity yet.
+        </div>
+        {% endif %}
+      </div>
     </div>
-    {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="bi bi-building fs-1 d-block mb-2"></i>
-      No deals yet. <a href="{{ url_for('new_deal') }}">Add your first deal.</a>
-    </div>
-    {% endif %}
   </div>
 </div>
+
 {% endblock %}
