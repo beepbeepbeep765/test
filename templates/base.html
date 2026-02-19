@@ -42,6 +42,11 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link rounded px-3 {% if request.endpoint == 'emails' or request.endpoint == 'sync_emails' %}active bg-white bg-opacity-10{% endif %}" href="{{ url_for('emails') }}">
+            <i class="bi bi-envelope me-1"></i>Emails
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link rounded px-3 {% if 'template' in (request.endpoint or '') %}active bg-white bg-opacity-10{% endif %}" href="{{ url_for('templates') }}">
             <i class="bi bi-envelope-paper me-1"></i>Templates
           </a>

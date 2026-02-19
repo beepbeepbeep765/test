@@ -82,6 +82,21 @@ def init_db():
             body TEXT NOT NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT,
+            body TEXT,
+            to_addr TEXT,
+            cc_addr TEXT,
+            sent_on TEXT,
+            deal_id INTEGER,
+            contact_id INTEGER,
+            entry_id TEXT UNIQUE,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (deal_id) REFERENCES deals(id),
+            FOREIGN KEY (contact_id) REFERENCES gp_contacts(id)
+        );
     """)
 
     # Safe migrations for existing databases
@@ -627,6 +642,131 @@ def outlook_import(deal_id):
     conn.commit(); conn.close()
     flash("Email imported as outreach entry.", "success")
     return redirect(url_for("deal_detail", deal_id=deal_id))
+
+
+# ── Email Archive ──────────────────────────────────────────────────────────────
+
+@app.route("/emails")
+def emails():
+    q = request.args.get("q", "").strip()
+    deal_filter = request.args.get("deal_id", "")
+    conn = get_db()
+    sql = (
+        "SELECT e.*, d.name as deal_name, g.name as gp_name "
+        "FROM emails e "
+        "LEFT JOIN deals d ON e.deal_id = d.id "
+        "LEFT JOIN gp_contacts g ON e.contact_id = g.id "
+        "WHERE 1=1"
+    )
+    params = []
+    if q:
+        sql += " AND (e.subject LIKE ? OR e.body LIKE ? OR e.to_addr LIKE ?)"
+        params += [f"%{q}%"] * 3
+    if deal_filter:
+        sql += " AND e.deal_id = ?"
+        params.append(deal_filter)
+    sql += " ORDER BY e.sent_on DESC LIMIT 300"
+    rows = conn.execute(sql, params).fetchall()
+    deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
+    total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
+    conn.close()
+    return render_template("emails.html", emails=rows, q=q, deals=deals,
+                           deal_filter=deal_filter, total=total)
+
+
+@app.route("/emails/sync", methods=["POST"])
+def sync_emails():
+    days = int(request.form.get("days", 90))
+    try:
+        import win32com.client
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        ns = outlook.GetNamespace("MAPI")
+        sent_folder = ns.GetDefaultFolder(5)  # 5 = Sent Items
+        cutoff = datetime.now() - timedelta(days=days)
+
+        conn = get_db()
+        deals = conn.execute("SELECT id, name FROM deals").fetchall()
+        contacts = conn.execute(
+            "SELECT id, email FROM gp_contacts WHERE email IS NOT NULL AND email != ''"
+        ).fetchall()
+
+        contact_email_map = {c["email"].lower().strip(): c["id"] for c in contacts}
+        # Build deal keyword list: use words >3 chars from deal name
+        deal_keywords = []
+        for d in deals:
+            words = [w for w in d["name"].lower().split() if len(w) > 3]
+            if words:
+                deal_keywords.append((words[:3], d["id"]))
+
+        synced = skipped = 0
+        for item in sent_folder.Items:
+            try:
+                if item.Class != 43:
+                    continue
+                sent_on = item.SentOn.replace(tzinfo=None)
+                if sent_on < cutoff:
+                    continue
+                entry_id = item.EntryID
+                subject = item.Subject or ""
+                body = (item.Body or "")[:8000]
+                to_addr = item.To or ""
+                cc_addr = item.CC or ""
+                sent_on_str = sent_on.strftime("%Y-%m-%d")
+
+                # Auto-match GP contact by email address
+                contact_id = None
+                all_recipients = (to_addr + ";" + cc_addr).lower().replace(",", ";")
+                for addr in all_recipients.split(";"):
+                    addr = addr.strip()
+                    if addr in contact_email_map:
+                        contact_id = contact_email_map[addr]
+                        break
+
+                # Auto-match deal by keywords in subject
+                deal_id = None
+                subject_lower = subject.lower()
+                for words, d_id in deal_keywords:
+                    if any(w in subject_lower for w in words):
+                        deal_id = d_id
+                        break
+
+                try:
+                    conn.execute(
+                        "INSERT INTO emails (subject, body, to_addr, cc_addr, sent_on, "
+                        "deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (subject, body, to_addr, cc_addr, sent_on_str,
+                         deal_id, contact_id, entry_id),
+                    )
+                    synced += 1
+                except Exception:
+                    skipped += 1  # duplicate entry_id — already imported
+            except Exception:
+                continue
+
+        conn.commit()
+        conn.close()
+        flash(f"Synced {synced} new emails. {skipped} already imported.", "success")
+    except ImportError:
+        flash("pywin32 not installed. In your Command Prompt run: pip install pywin32", "danger")
+    except Exception as e:
+        flash(f"Could not connect to Outlook: {e}", "danger")
+    return redirect(url_for("emails"))
+
+
+@app.route("/emails/<int:email_id>/link", methods=["POST"])
+def link_email(email_id):
+    deal_id = request.form.get("deal_id") or None
+    contact_id = request.form.get("contact_id") or None
+    conn = get_db()
+    conn.execute(
+        "UPDATE emails SET deal_id=?, contact_id=? WHERE id=?",
+        (deal_id, contact_id, email_id),
+    )
+    conn.commit()
+    conn.close()
+    flash("Email linked.", "success")
+    return redirect(url_for("emails", q=request.form.get("q", ""),
+                            deal_id=request.form.get("deal_filter", "")))
 
 
 with app.app_context():
