@@ -658,7 +658,9 @@ def outlook_sync(deal_id):
 
     if request.method == "POST" and search_email:
         try:
+            import pythoncom
             import win32com.client
+            pythoncom.CoInitialize()
             outlook = win32com.client.Dispatch("Outlook.Application")
             ns = outlook.GetNamespace("MAPI")
             sent = ns.GetDefaultFolder(5)
@@ -837,10 +839,12 @@ def _sync_folder(folder, direction, cutoff, conn, contact_email_map, deal_keywor
 
 @app.route("/emails/sync", methods=["POST"])
 def sync_emails():
-    days = int(request.form.get("days", 90))
+    days = int(request.form.get("days", 1))
     include_inbox = request.form.get("include_inbox") == "1"
     try:
+        import pythoncom
         import win32com.client
+        pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch("Outlook.Application")
         ns = outlook.GetNamespace("MAPI")
         cutoff = datetime.now() - timedelta(days=days)
