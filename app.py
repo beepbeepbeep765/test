@@ -713,36 +713,55 @@ def outlook_sync(deal_id):
     days = int(request.form.get("days", 30))
 
     if request.method == "POST" and search_email:
-        try:
-            import pythoncom
-            import win32com.client
-            pythoncom.CoInitialize()
-            outlook = win32com.client.Dispatch("Outlook.Application")
-            ns = outlook.GetNamespace("MAPI")
-            sent = ns.GetDefaultFolder(5)
-            cutoff = datetime.now() - timedelta(days=days)
-            for item in sent.Items:
+        import threading
+
+        result = {}
+
+        def _fetch(search_email=search_email, days=days):
+            try:
+                import pythoncom
+                import win32com.client
+                pythoncom.CoInitialize()
                 try:
-                    if item.Class != 43:
-                        continue
-                    sent_on = item.SentOn.replace(tzinfo=None)
-                    if sent_on < cutoff:
-                        continue
-                    recipients = (item.To or "") + ";" + (item.CC or "")
-                    if search_email.lower() not in recipients.lower():
-                        continue
-                    emails.append({
-                        "subject": item.Subject or "",
-                        "to": item.To or "",
-                        "sent_on": sent_on.strftime("%Y-%m-%d"),
-                        "preview": (item.Body or "")[:400].replace("\r\n", " ").replace("\n", " "),
-                    })
-                except Exception:
-                    continue
-        except ImportError:
-            error = "pywin32 not installed. In your Command Prompt run: pip install pywin32"
-        except Exception as e:
-            error = f"Could not connect to Outlook: {e}"
+                    outlook = win32com.client.Dispatch("Outlook.Application")
+                    ns = outlook.GetNamespace("MAPI")
+                    sent = ns.GetDefaultFolder(5)
+                    cutoff = datetime.now() - timedelta(days=days)
+                    found = []
+                    for item in sent.Items:
+                        try:
+                            if item.Class != 43:
+                                continue
+                            sent_on = item.SentOn.replace(tzinfo=None)
+                            if sent_on < cutoff:
+                                continue
+                            recipients = (item.To or "") + ";" + (item.CC or "")
+                            if search_email.lower() not in recipients.lower():
+                                continue
+                            found.append({
+                                "subject": item.Subject or "",
+                                "to": item.To or "",
+                                "sent_on": sent_on.strftime("%Y-%m-%d"),
+                                "preview": (item.Body or "")[:400].replace("\r\n", " ").replace("\n", " "),
+                            })
+                        except Exception:
+                            continue
+                    result["emails"] = found
+                finally:
+                    pythoncom.CoUninitialize()
+            except ImportError:
+                result["error"] = "pywin32 not installed. In your Command Prompt run: pip install pywin32"
+            except Exception as e:
+                result["error"] = f"Could not connect to Outlook: {e}"
+
+        t = threading.Thread(target=_fetch)
+        t.start()
+        t.join()
+
+        if "error" in result:
+            error = result["error"]
+        else:
+            emails = result.get("emails", [])
 
     conn.close()
     return render_template(
@@ -857,106 +876,122 @@ def email_detail(email_id):
     return render_template("email_detail.html", email=email, deals=deals, contacts=contacts)
 
 
-def _sync_folder(folder, direction, cutoff, conn, contact_email_map, deal_keywords, own_addrs):
-    synced = skipped = 0
-    for item in folder.Items:
-        try:
-            if item.Class != 43:
-                continue
-            sent_on = item.SentOn.replace(tzinfo=None) if hasattr(item, 'SentOn') else None
-            received_on = item.ReceivedTime.replace(tzinfo=None) if hasattr(item, 'ReceivedTime') else None
-            ts = sent_on or received_on
-            if not ts or ts < cutoff:
-                continue
-            entry_id = item.EntryID
-            subject = item.Subject or ""
-            body = (item.Body or "")[:10000]
-            to_addr = item.To or ""
-            cc_addr = item.CC or ""
-            from_addr = item.SenderEmailAddress or item.SenderName or ""
-            sent_on_str = ts.strftime("%Y-%m-%d")
-
-            # Auto-match GP contact
-            contact_id = None
-            all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
-            for addr in all_addrs.split(";"):
-                addr = addr.strip()
-                if addr and addr not in own_addrs and addr in contact_email_map:
-                    contact_id = contact_email_map[addr]
-                    break
-
-            # Auto-match deal by keywords in subject
-            deal_id = None
-            subject_lower = subject.lower()
-            for words, d_id in deal_keywords:
-                if any(w in subject_lower for w in words):
-                    deal_id = d_id
-                    break
-
-            try:
-                conn.execute(
-                    "INSERT INTO emails (subject, body, from_addr, to_addr, cc_addr, sent_on, "
-                    "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (subject, body, from_addr, to_addr, cc_addr, sent_on_str,
-                     direction, deal_id, contact_id, entry_id),
-                )
-                synced += 1
-            except Exception:
-                skipped += 1
-        except Exception:
-            continue
-    return synced, skipped
-
-
 @app.route("/emails/sync", methods=["POST"])
 def sync_emails():
     days = int(request.form.get("days", 1))
     include_inbox = request.form.get("include_inbox") == "1"
-    try:
-        import pythoncom
-        import win32com.client
-        pythoncom.CoInitialize()
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        ns = outlook.GetNamespace("MAPI")
-        cutoff = datetime.now() - timedelta(days=days)
 
-        conn = get_db()
-        deals = conn.execute("SELECT id, name FROM deals").fetchall()
-        contacts = conn.execute(
-            "SELECT id, email FROM gp_contacts WHERE email IS NOT NULL AND email != ''"
-        ).fetchall()
-        contact_email_map = {c["email"].lower().strip(): c["id"] for c in contacts}
-        deal_keywords = []
-        for d in deals:
-            words = [w for w in d["name"].lower().split() if len(w) > 3]
-            if words:
-                deal_keywords.append((words[:3], d["id"]))
+    # Pull DB data before entering the COM thread
+    conn = get_db()
+    deals = conn.execute("SELECT id, name FROM deals").fetchall()
+    contacts = conn.execute(
+        "SELECT id, email FROM gp_contacts WHERE email IS NOT NULL AND email != ''"
+    ).fetchall()
+    conn.close()
 
-        # Get own email addresses to avoid self-matching
-        own_addrs = set()
+    contact_email_map = {c["email"].lower().strip(): c["id"] for c in contacts}
+    deal_keywords = []
+    for d in deals:
+        words = [w for w in d["name"].lower().split() if len(w) > 3]
+        if words:
+            deal_keywords.append((words[:3], d["id"]))
+
+    import threading
+    result = {}
+
+    def _sync(days=days, include_inbox=include_inbox,
+               contact_email_map=contact_email_map, deal_keywords=deal_keywords):
         try:
-            for acct in ns.Accounts:
-                own_addrs.add(acct.SmtpAddress.lower().strip())
-        except Exception:
-            pass
+            import pythoncom
+            import win32com.client
+            pythoncom.CoInitialize()
+            try:
+                outlook = win32com.client.Dispatch("Outlook.Application")
+                ns = outlook.GetNamespace("MAPI")
+                cutoff = datetime.now() - timedelta(days=days)
 
-        # Sync Sent Items (folder 5)
-        sent_folder = ns.GetDefaultFolder(5)
-        synced, skipped = _sync_folder(sent_folder, "sent", cutoff, conn, contact_email_map, deal_keywords, own_addrs)
+                own_addrs = set()
+                try:
+                    for acct in ns.Accounts:
+                        own_addrs.add(acct.SmtpAddress.lower().strip())
+                except Exception:
+                    pass
 
-        # Optionally sync Inbox (folder 6)
-        if include_inbox:
-            inbox = ns.GetDefaultFolder(6)
-            s2, sk2 = _sync_folder(inbox, "received", cutoff, conn, contact_email_map, deal_keywords, own_addrs)
-            synced += s2; skipped += sk2
+                rows = []
 
+                def _collect_folder(folder, direction):
+                    for item in folder.Items:
+                        try:
+                            if item.Class != 43:
+                                continue
+                            sent_on = item.SentOn.replace(tzinfo=None) if hasattr(item, 'SentOn') else None
+                            received_on = item.ReceivedTime.replace(tzinfo=None) if hasattr(item, 'ReceivedTime') else None
+                            ts = sent_on or received_on
+                            if not ts or ts < cutoff:
+                                continue
+                            entry_id = item.EntryID
+                            subject = item.Subject or ""
+                            body = (item.Body or "")[:10000]
+                            to_addr = item.To or ""
+                            cc_addr = item.CC or ""
+                            from_addr = item.SenderEmailAddress or item.SenderName or ""
+                            sent_on_str = ts.strftime("%Y-%m-%d")
+
+                            contact_id = None
+                            all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
+                            for addr in all_addrs.split(";"):
+                                addr = addr.strip()
+                                if addr and addr not in own_addrs and addr in contact_email_map:
+                                    contact_id = contact_email_map[addr]
+                                    break
+
+                            deal_id = None
+                            subject_lower = subject.lower()
+                            for words, d_id in deal_keywords:
+                                if any(w in subject_lower for w in words):
+                                    deal_id = d_id
+                                    break
+
+                            rows.append((subject, body, from_addr, to_addr, cc_addr,
+                                         sent_on_str, direction, deal_id, contact_id, entry_id))
+                        except Exception:
+                            continue
+
+                _collect_folder(ns.GetDefaultFolder(5), "sent")
+                if include_inbox:
+                    _collect_folder(ns.GetDefaultFolder(6), "received")
+
+                result["rows"] = rows
+            finally:
+                pythoncom.CoUninitialize()
+        except ImportError:
+            result["error"] = "pywin32 not installed. Run: pip install pywin32"
+        except Exception as e:
+            result["error"] = f"Could not connect to Outlook: {e}"
+
+    t = threading.Thread(target=_sync)
+    t.start()
+    t.join()
+
+    if "error" in result:
+        flash(result["error"], "danger")
+    else:
+        conn = get_db()
+        synced = skipped = 0
+        for row in result.get("rows", []):
+            try:
+                conn.execute(
+                    "INSERT INTO emails (subject, body, from_addr, to_addr, cc_addr, sent_on, "
+                    "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    row,
+                )
+                synced += 1
+            except Exception:
+                skipped += 1
         conn.commit()
         conn.close()
         flash(f"Synced {synced} new emails ({skipped} already imported).", "success")
-    except ImportError:
-        flash("pywin32 not installed. Run: pip install pywin32", "danger")
-    except Exception as e:
-        flash(f"Could not connect to Outlook: {e}", "danger")
+
     return redirect(url_for("emails"))
 
 
