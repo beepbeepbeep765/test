@@ -945,7 +945,14 @@ def sync_emails():
                                 body = (item.Body or "")[:10000]
                                 to_addr = item.To or ""
                                 cc_addr = item.CC or ""
-                                from_addr = item.SenderEmailAddress or item.SenderName or ""
+                                try:
+                                    if item.SenderEmailType == "EX":
+                                        ex_user = item.Sender.GetExchangeUser()
+                                        from_addr = ex_user.PrimarySmtpAddress if ex_user else (item.SenderName or "")
+                                    else:
+                                        from_addr = item.SenderEmailAddress or item.SenderName or ""
+                                except Exception:
+                                    from_addr = item.SenderName or ""
                                 sent_on_str = ts.strftime("%Y-%m-%d")
 
                                 contact_id = None
@@ -997,7 +1004,8 @@ def sync_emails():
             try:
                 conn.execute(
                     "INSERT INTO emails (subject, body, from_addr, to_addr, cc_addr, sent_on, "
-                    "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(entry_id) DO UPDATE SET from_addr=excluded.from_addr",
                     row,
                 )
                 synced += 1
