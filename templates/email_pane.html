@@ -1,0 +1,31 @@
+<div class="eml-reading-toolbar">
+  <a href="{{ url_for('email_detail', email_id=e.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-box-arrow-up-right"></i> Full Page
+  </a>
+  {% if not e.deal_id %}
+  <a href="{{ url_for('email_detail', email_id=e.id) }}#link-deal" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-link-45deg"></i> Link to Deal
+  </a>
+  {% endif %}
+  <a href="{{ url_for('new_outreach', deal_id=e.deal_id or 0) if e.deal_id else url_for('email_detail', email_id=e.id) }}"
+     class="btn btn-primary btn-sm">
+    <i class="bi bi-plus"></i> Log as Outreach
+  </a>
+</div>
+<div class="eml-reading-body" id="readingBody">
+  <div class="eml-subject-line">{{ e.subject or '(no subject)' }}</div>
+  <div class="eml-meta">
+    <strong>From:</strong> {{ e.from_addr or '—' }}<br>
+    <strong>To:</strong> {{ e.to_addr or '—' }}<br>
+    {% if e.cc_addr %}<strong>CC:</strong> {{ e.cc_addr }}<br>{% endif %}
+    <strong>Date:</strong> {{ e.sent_on | fmtdatetime }}<br>
+    {% if e.deal_name %}<strong>Deal:</strong>
+      <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" style="color:#0078d4;">{{ e.deal_name }}</a><br>
+    {% endif %}
+    {% if e.gp_name %}<strong>Contact:</strong>
+      <a href="{{ url_for('contact_detail', contact_id=e.contact_id) }}" style="color:#0078d4;">{{ e.gp_name }}</a>
+    {% endif %}
+  </div>
+  <hr class="eml-divider">
+  <div class="eml-body-text">{{ e.body or '(no body)' }}</div>
+</div>

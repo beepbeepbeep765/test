@@ -144,7 +144,7 @@
         <a href="{{ url_for('email_detail', email_id=e.id) }}"
            class="eml-row {% if loop.first %}active{% endif %}"
            data-id="{{ e.id }}"
-           onclick="loadEmail(event, this, '{{ url_for('email_detail', email_id=e.id) }}')">
+           onclick="loadEmail(event, this, '{{ url_for('email_pane', email_id=e.id) }}')">
           <div class="eml-row-top">
             <span class="eml-row-who">
               {% if e.direction == 'received' %}{{ e.from_addr or '—' }}{% else %}To: {{ e.to_addr or '—' }}{% endif %}
@@ -241,17 +241,15 @@ function loadEmail(evt, row, url) {
   evt.preventDefault();
   document.querySelectorAll('.eml-row').forEach(r => r.classList.remove('active'));
   row.classList.add('active');
-  fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+  const pane = document.getElementById('readingPane');
+  pane.style.opacity = '0.5';
+  fetch(url)
     .then(r => r.text())
     .then(html => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const body = doc.querySelector('#readingBody');
-      const toolbar = doc.querySelector('.eml-reading-toolbar');
-      if (body) document.getElementById('readingBody').innerHTML = body.innerHTML;
-      if (toolbar) document.querySelector('.eml-reading-toolbar').innerHTML = toolbar.innerHTML;
+      pane.innerHTML = html;
+      pane.style.opacity = '1';
     })
-    .catch(() => { window.location.href = url; });
+    .catch(() => { window.location.href = row.href; });
 }
 </script>
 

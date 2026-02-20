@@ -1002,6 +1002,23 @@ def email_detail(email_id):
     return render_template("email_detail.html", email=email, deals=deals, contacts=contacts)
 
 
+@app.route("/emails/<int:email_id>/pane")
+def email_pane(email_id):
+    """Returns just the reading pane HTML fragment for the email archive AJAX loader."""
+    conn = get_db()
+    email = conn.execute(
+        "SELECT e.*, d.name as deal_name, g.name as gp_name "
+        "FROM emails e "
+        "LEFT JOIN deals d ON e.deal_id = d.id "
+        "LEFT JOIN gp_contacts g ON e.contact_id = g.id "
+        "WHERE e.id = ?", (email_id,)
+    ).fetchone()
+    conn.close()
+    if not email:
+        return "<p class='text-danger p-3'>Email not found.</p>", 404
+    return render_template("email_pane.html", e=email)
+
+
 @app.route("/emails/sync", methods=["POST"])
 def sync_emails():
     days = int(request.form.get("days", 1))
