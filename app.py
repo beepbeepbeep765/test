@@ -460,6 +460,62 @@ def delete_outreach(deal_id, outreach_id):
     return redirect(url_for("deal_detail", deal_id=deal_id))
 
 
+@app.route("/outreach/from-email", methods=["POST"])
+def outreach_from_email():
+    """One-click: log an outreach entry directly from an email."""
+    deal_id = request.form.get("deal_id")
+    if not deal_id:
+        flash("Please select a deal first.", "warning")
+        return redirect(request.referrer or url_for("emails"))
+    conn = get_db()
+    deal = conn.execute("SELECT id FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if not deal:
+        conn.close(); flash("Deal not found.", "danger")
+        return redirect(request.referrer or url_for("emails"))
+    conn.execute(
+        "INSERT INTO outreach (deal_id, contact_name, company, email, sent_by, "
+        "outreach_date, outreach_summary, follow_up_needed, stage, interest_level) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (deal_id,
+         request.form.get("contact_name", ""),
+         request.form.get("company", ""),
+         request.form.get("contact_email", ""),
+         request.form.get("sent_by", ""),
+         request.form.get("outreach_date") or None,
+         request.form.get("outreach_summary", ""),
+         1 if request.form.get("follow_up_needed") else 0,
+         request.form.get("stage", "Initial Email"),
+         request.form.get("interest_level", "Unknown")),
+    )
+    conn.commit(); conn.close()
+    flash("Outreach logged from email.", "success")
+    return redirect(url_for("deal_detail", deal_id=deal_id))
+
+
+@app.route("/deals/<int:deal_id>/report")
+def deal_report(deal_id):
+    """Printable one-pager for a deal."""
+    conn = get_db()
+    deal = conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if not deal:
+        conn.close(); flash("Deal not found.", "danger"); return redirect(url_for("deals"))
+    outreaches = conn.execute(
+        "SELECT * FROM outreach WHERE deal_id = ? ORDER BY outreach_date DESC",
+        (deal_id,),
+    ).fetchall()
+    all_gps = conn.execute("SELECT * FROM gp_contacts").fetchall()
+    matches = []
+    for gp in all_gps:
+        sc, reasons = score_gp(deal, gp)
+        if sc > 0:
+            matches.append({"gp": gp, "score": sc, "reasons": reasons})
+    matches.sort(key=lambda x: x["score"], reverse=True)
+    conn.close()
+    from datetime import date as _date
+    return render_template("deal_report.html", deal=deal, outreaches=outreaches,
+                           matching_gps=matches[:10], now=_date.today().strftime("%B %d, %Y"))
+
+
 # ── Activity Log ───────────────────────────────────────────────────────────────
 
 @app.route("/activity")

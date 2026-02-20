@@ -16,6 +16,7 @@
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <span class="badge fs-6 {% if deal.status == 'Active' %}bg-success{% elif deal.status == 'Closed' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ deal.status }}</span>
     <a href="{{ url_for('outlook_sync', deal_id=deal.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope-arrow-up me-1"></i>Import from Outlook</a>
+    <a href="{{ url_for('deal_report', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="bi bi-printer me-1"></i>Print Report</a>
     <a href="{{ url_for('edit_deal', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
   </div>
 </div>

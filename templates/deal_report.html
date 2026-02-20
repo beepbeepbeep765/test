@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ deal.name }} — Status Report{% endblock %}
+{% block content %}
+
+<style>
+@media print {
+  .navbar, .no-print { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .card { border: 1px solid #ccc !important; background: #fff !important; box-shadow: none !important; }
+  .card-header { background: #f5f5f5 !important; color: #000 !important; }
+  .table { color: #000 !important; }
+  .table th, .table td { border-color: #ddd !important; color: #000 !important; }
+  .badge { border: 1px solid #999 !important; color: #000 !important; background: #eee !important; }
+  .text-muted { color: #555 !important; }
+  a { color: #000 !important; text-decoration: none !important; }
+  .metric-val, .metric-lbl { color: #000 !important; }
+  .container-fluid { padding: 0 !important; }
+}
+</style>
+
+<!-- Toolbar (hidden when printing) -->
+<div class="d-flex align-items-center justify-content-between mb-4 no-print">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('deal_detail', deal_id=deal.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h5 class="mb-0 fw-bold">Status Report — {{ deal.name }}</h5>
+  </div>
+  <button onclick="window.print()" class="btn btn-warning fw-semibold">
+    <i class="bi bi-printer me-2"></i>Print / Save as PDF
+  </button>
+</div>
+
+<!-- Report Header -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h3 class="fw-bold mb-1">{{ deal.name }}</h3>
+        <div class="text-muted small">
+          {% if deal.asset_type %}{{ deal.asset_type }}{% endif %}
+          {% if deal.asset_type and deal.location %} &middot; {% endif %}
+          {% if deal.location %}{{ deal.location }}{% endif %}
+          {% if deal.closing_date %} &middot; Target Close: {{ deal.closing_date }}{% endif %}
+        </div>
+      </div>
+      <div class="text-end">
+        <span class="badge fs-6 {% if deal.status == 'Active' %}bg-success{% elif deal.status == 'Closed' %}bg-secondary{% else %}bg-warning{% endif %}">
+          {{ deal.status }}
+        </span>
+        <div class="text-muted small mt-1">Report generated {{ now }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deal Metrics -->
+{% set has_metrics = deal.purchase_price or deal.target_raise or deal.noi_current or deal.noi_projected or deal.cap_rate or deal.exit_cap_rate or deal.ltv or deal.irr_target or deal.equity_multiple or deal.hold_period %}
+{% if has_metrics %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-2"><strong class="small">Deal Metrics</strong></div>
+  <div class="card-body py-3 px-4">
+    <div class="row g-0 text-center metric-strip">
+      {% if deal.purchase_price %}<div class="col metric-item"><div class="metric-val">{{ deal.purchase_price }}</div><div class="metric-lbl">Purchase Price</div></div>{% endif %}
+      {% if deal.target_raise %}<div class="col metric-item"><div class="metric-val">{{ deal.target_raise }}</div><div class="metric-lbl">Equity Raise</div></div>{% endif %}
+      {% if deal.ltv %}<div class="col metric-item"><div class="metric-val">{{ deal.ltv }}</div><div class="metric-lbl">LTV</div></div>{% endif %}
+      {% if deal.cap_rate %}<div class="col metric-item"><div class="metric-val">{{ deal.cap_rate }}</div><div class="metric-lbl">Going-in Cap</div></div>{% endif %}
+      {% if deal.exit_cap_rate %}<div class="col metric-item"><div class="metric-val">{{ deal.exit_cap_rate }}</div><div class="metric-lbl">Exit Cap</div></div>{% endif %}
+      {% if deal.irr_target %}<div class="col metric-item"><div class="metric-val">{{ deal.irr_target }}</div><div class="metric-lbl">Target IRR</div></div>{% endif %}
+      {% if deal.equity_multiple %}<div class="col metric-item"><div class="metric-val">{{ deal.equity_multiple }}</div><div class="metric-lbl">EM</div></div>{% endif %}
+      {% if deal.hold_period %}<div class="col metric-item"><div class="metric-val">{{ deal.hold_period }}</div><div class="metric-lbl">Hold Period</div></div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if deal.notes %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-2"><strong class="small">Deal Notes</strong></div>
+  <div class="card-body py-3 px-4 small">{{ deal.notes }}</div>
+</div>
+{% endif %}
+
+<!-- Pipeline Summary -->
+{% if outreaches %}
+{% set stages = ['Initial Email', 'OM Sent', 'NDA Signed', 'Call / Meeting', 'Deep Dive / DD', 'Soft Circle', 'Hard Commit', 'Passed'] %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-2"><strong class="small">Investor Pipeline Summary</strong></div>
+  <div class="card-body pb-3 pt-3 px-4">
+    <div class="d-flex gap-2 flex-wrap pipeline-stages">
+      {% for stage in stages %}
+      {% set count = outreaches | selectattr('stage', 'equalto', stage) | list | length %}
+      <div class="pipeline-stage {% if count > 0 %}pipeline-stage--active{% endif %}">
+        <div class="pipeline-count">{{ count }}</div>
+        <div class="pipeline-name">{{ stage }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Full Outreach Log -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-2 d-flex align-items-center justify-content-between">
+    <strong class="small">Full Outreach Log</strong>
+    <span class="badge bg-secondary">{{ outreaches|length }} contacts</span>
+  </div>
+  <div class="card-body p-0">
+    {% if outreaches %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle" style="font-size:.82rem;">
+        <thead>
+          <tr>
+            <th>Contact</th><th>Stage</th><th>Interest</th><th>Sent By</th>
+            <th>Date</th><th>Our Message</th><th>Their Response</th><th>Follow-up</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in outreaches %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ o.contact_name }}</div>
+              {% if o.company %}<div class="text-muted" style="font-size:.75rem;">{{ o.company }}</div>{% endif %}
+              {% if o.email %}<div class="text-muted" style="font-size:.72rem;">{{ o.email }}</div>{% endif %}
+            </td>
+            <td><span class="badge stage-badge stage-{{ (o.stage or 'Initial Email')|lower|replace(' ', '-')|replace('/', '') }}">{{ o.stage or 'Initial Email' }}</span></td>
+            <td>
+              {% set il = o.interest_level or 'Unknown' %}
+              <span class="badge {% if il == 'Hot' %}bg-danger{% elif il == 'Warm' %}bg-warning{% elif il == 'Passed' %}bg-secondary{% elif il == 'Interested' %}bg-success{% else %}bg-secondary{% endif %}">{{ il }}</span>
+            </td>
+            <td class="text-muted">{{ o.sent_by or '—' }}</td>
+            <td class="text-muted text-nowrap">{{ o.outreach_date or '—' }}</td>
+            <td class="small text-muted" style="max-width:180px;">{{ o.outreach_summary or '—' }}</td>
+            <td class="small text-muted" style="max-width:180px;">{{ o.response_summary or '—' }}</td>
+            <td class="text-center">
+              {% if o.follow_up_needed %}
+              <span class="badge bg-warning"><i class="bi bi-exclamation-circle"></i> Yes{% if o.follow_up_date %} · {{ o.follow_up_date }}{% endif %}</span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted small">No outreach logged yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- GP Matches -->
+{% if matching_gps %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header py-2"><strong class="small">Suggested GP Targets</strong></div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle" style="font-size:.82rem;">
+      <thead>
+        <tr><th>Name</th><th>Firm</th><th>Strategy</th><th>Check Size</th><th>Status</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        {% for m in matching_gps %}
+        <tr>
+          <td class="fw-semibold">{{ m.gp.name }}</td>
+          <td class="text-muted">{{ m.gp.company or '—' }}</td>
+          <td class="text-muted">{{ m.gp.strategy or '—' }}</td>
+          <td class="text-muted">
+            {% if m.gp.min_check or m.gp.max_check %}{{ m.gp.min_check or '' }}{% if m.gp.min_check and m.gp.max_check %}–{% endif %}{{ m.gp.max_check or '' }}{% else %}—{% endif %}
+          </td>
+          <td><span class="badge bg-secondary">{{ m.gp.status or '—' }}</span></td>
+          <td>{% for r in m.reasons %}<span class="badge bg-secondary me-1" style="font-size:.7rem;">{{ r }}</span>{% endfor %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
