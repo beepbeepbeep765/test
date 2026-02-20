@@ -149,7 +149,7 @@
             <span class="eml-row-who">
               {% if e.direction == 'received' %}{{ e.from_addr or '—' }}{% else %}To: {{ e.to_addr or '—' }}{% endif %}
             </span>
-            <span class="eml-row-date">{{ e.sent_on }}</span>
+            <span class="eml-row-date">{{ e.sent_on | fmtdatetime }}</span>
           </div>
           <div class="eml-row-subject">{{ e.subject or '(no subject)' }}</div>
           <div class="eml-row-preview">{{ (e.body or '')[:90] | replace('\n',' ') | replace('\r','') }}</div>
@@ -215,7 +215,7 @@
           <strong>From:</strong> {{ e.from_addr or '—' }}<br>
           <strong>To:</strong> {{ e.to_addr or '—' }}<br>
           {% if e.cc_addr %}<strong>CC:</strong> {{ e.cc_addr }}<br>{% endif %}
-          <strong>Date:</strong> {{ e.sent_on }}<br>
+          <strong>Date:</strong> {{ e.sent_on | fmtdatetime }}<br>
           {% if e.deal_name %}<strong>Deal:</strong>
             <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" style="color:#0078d4;">{{ e.deal_name }}</a><br>
           {% endif %}

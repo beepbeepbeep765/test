@@ -8,6 +8,27 @@ from flask import Flask, render_template, request, redirect, url_for, flash, Res
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
 
+
+@app.template_filter("fmtdatetime")
+def fmt_datetime(value):
+    """Format 'YYYY-MM-DD HH:MM' or 'YYYY-MM-DD' into 'Feb 20 · 2:30 PM'."""
+    if not value:
+        return ""
+    s = str(value)
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            date_str = dt.strftime("%b") + " " + str(dt.day)
+            if " " in s:
+                hour = dt.hour % 12 or 12
+                ampm = "AM" if dt.hour < 12 else "PM"
+                time_str = f"{hour}:{dt.minute:02d} {ampm}"
+                return f"{date_str} · {time_str}"
+            return date_str
+        except ValueError:
+            continue
+    return s
+
 DATABASE = os.environ.get("DATABASE_PATH", "crm.db")
 
 
@@ -1072,7 +1093,7 @@ def sync_emails():
                                         from_addr = item.SenderEmailAddress or item.SenderName or ""
                                     except Exception:
                                         from_addr = item.SenderName or ""
-                                sent_on_str = ts.strftime("%Y-%m-%d")
+                                sent_on_str = ts.strftime("%Y-%m-%d %H:%M")
 
                                 contact_id = None
                                 all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
