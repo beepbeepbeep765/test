@@ -39,6 +39,7 @@ def init_db():
             irr_target TEXT,
             equity_multiple TEXT,
             closing_date TEXT,
+            email_keywords TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -184,6 +185,7 @@ def init_db():
         "ALTER TABLE emails ADD COLUMN from_addr TEXT",
         "ALTER TABLE emails ADD COLUMN direction TEXT DEFAULT 'sent'",
         "ALTER TABLE emails ADD COLUMN tags TEXT",
+        "ALTER TABLE deals ADD COLUMN email_keywords TEXT",
     ]:
         try:
             conn.execute(stmt)
@@ -366,8 +368,8 @@ def new_deal():
         conn.execute(
             "INSERT INTO deals (name, asset_type, location, target_raise, status, notes, "
             "purchase_price, units_sf, noi_current, noi_projected, cap_rate, exit_cap_rate, "
-            "ltv, hold_period, irr_target, equity_multiple, closing_date) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "ltv, hold_period, irr_target, equity_multiple, closing_date, email_keywords) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (request.form["name"], request.form.get("asset_type", ""),
              request.form.get("location", ""), request.form.get("target_raise", ""),
              request.form.get("status", "Active"), request.form.get("notes", ""),
@@ -376,7 +378,8 @@ def new_deal():
              request.form.get("cap_rate", "") or None, request.form.get("exit_cap_rate", "") or None,
              request.form.get("ltv", "") or None, request.form.get("hold_period", "") or None,
              request.form.get("irr_target", "") or None, request.form.get("equity_multiple", "") or None,
-             request.form.get("closing_date", "") or None),
+             request.form.get("closing_date", "") or None,
+             request.form.get("email_keywords", "") or None),
         )
         conn.commit(); conn.close()
         flash("Deal created.", "success")
@@ -415,7 +418,7 @@ def edit_deal(deal_id):
         conn.execute(
             "UPDATE deals SET name=?, asset_type=?, location=?, target_raise=?, status=?, notes=?, "
             "purchase_price=?, units_sf=?, noi_current=?, noi_projected=?, cap_rate=?, exit_cap_rate=?, "
-            "ltv=?, hold_period=?, irr_target=?, equity_multiple=?, closing_date=? WHERE id=?",
+            "ltv=?, hold_period=?, irr_target=?, equity_multiple=?, closing_date=?, email_keywords=? WHERE id=?",
             (request.form["name"], request.form.get("asset_type", ""),
              request.form.get("location", ""), request.form.get("target_raise", ""),
              request.form.get("status", "Active"), request.form.get("notes", ""),
@@ -424,7 +427,8 @@ def edit_deal(deal_id):
              request.form.get("cap_rate", "") or None, request.form.get("exit_cap_rate", "") or None,
              request.form.get("ltv", "") or None, request.form.get("hold_period", "") or None,
              request.form.get("irr_target", "") or None, request.form.get("equity_multiple", "") or None,
-             request.form.get("closing_date", "") or None, deal_id),
+             request.form.get("closing_date", "") or None,
+             request.form.get("email_keywords", "") or None, deal_id),
         )
         conn.commit(); conn.close()
         flash("Deal updated.", "success")
@@ -945,7 +949,7 @@ def sync_emails():
 
     # Pull DB data before entering the COM thread
     conn = get_db()
-    deals = conn.execute("SELECT id, name FROM deals").fetchall()
+    deals = conn.execute("SELECT id, name, email_keywords FROM deals").fetchall()
     contacts = conn.execute(
         "SELECT id, email FROM gp_contacts WHERE email IS NOT NULL AND email != ''"
     ).fetchall()
@@ -954,9 +958,14 @@ def sync_emails():
     contact_email_map = {c["email"].lower().strip(): c["id"] for c in contacts}
     deal_keywords = []
     for d in deals:
-        words = [w for w in d["name"].lower().split() if len(w) > 3]
+        if d["email_keywords"] and d["email_keywords"].strip():
+            # Use manually set keywords (comma-separated)
+            words = [w.strip().lower() for w in d["email_keywords"].split(",") if w.strip()]
+        else:
+            # Fall back to auto-generating from deal name
+            words = [w for w in d["name"].lower().split() if len(w) > 3]
         if words:
-            deal_keywords.append((words[:3], d["id"]))
+            deal_keywords.append((words, d["id"]))
 
     import threading
     result = {}
