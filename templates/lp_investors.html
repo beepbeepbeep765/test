@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}LP Investors — ACRE CRM{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">LP Investors</h2>
+    <span class="text-muted small">Passive equity investor database</span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('export_lp_investors') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+    <a href="{{ url_for('new_lp_investor') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Add LP Investor
+    </a>
+  </div>
+</div>
+
+<form method="GET" class="d-flex gap-2 mb-3 flex-wrap">
+  <div class="input-group" style="max-width:320px;">
+    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+    <input type="text" name="q" class="form-control border-start-0 ps-0"
+           placeholder="Name, firm, asset type, market…" value="{{ q }}" />
+  </div>
+  <select name="status" class="form-select" style="max-width:180px;">
+    <option value="">All Statuses</option>
+    {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Hot Lead', 'Committed', 'Passed'] %}
+    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-outline-secondary">Filter</button>
+  {% if q or status_filter %}
+  <a href="{{ url_for('lp_investors') }}" class="btn btn-outline-danger">Clear</a>
+  {% endif %}
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if investors %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Name / Title</th>
+            <th>Firm</th>
+            <th>Asset Types</th>
+            <th>Check Size</th>
+            <th>Markets</th>
+            <th>Status</th>
+            <th>Last Touched</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in investors %}
+          <tr>
+            <td>
+              <a href="{{ url_for('lp_investor_detail', investor_id=inv.id) }}" class="text-decoration-none fw-semibold">{{ inv.name }}</a>
+              {% if inv.title %}<div class="text-muted small">{{ inv.title }}</div>{% endif %}
+            </td>
+            <td>{{ inv.company or '—' }}</td>
+            <td class="text-muted small">{{ inv.preferred_asset_types or '—' }}</td>
+            <td class="text-muted small">
+              {% if inv.min_check or inv.max_check %}{{ inv.min_check or '' }}{% if inv.min_check and inv.max_check %}–{% endif %}{{ inv.max_check or '' }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ inv.preferred_markets or '—' }}</td>
+            <td>
+              <span class="badge {% if inv.status == 'Hot Lead' %}bg-danger{% elif inv.status == 'Committed' %}bg-success{% elif inv.status == 'In Contact' %}bg-primary{% elif inv.status == 'Meeting Scheduled' %}bg-info text-dark{% elif inv.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
+                {{ inv.status }}
+              </span>
+            </td>
+            <td class="text-muted small text-nowrap">{{ inv.last_contacted or '—' }}</td>
+            <td>
+              <a href="{{ url_for('lp_investor_detail', investor_id=inv.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-3 py-2 text-muted small border-top">{{ investors|length }} investor{{ 's' if investors|length != 1 }}</div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-person-circle fs-1 d-block mb-2"></i>
+      {% if q or status_filter %}
+        No investors match your search.
+      {% else %}
+        No LP investors yet. <a href="{{ url_for('new_lp_investor') }}">Add your first one.</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

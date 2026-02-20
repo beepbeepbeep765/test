@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('lenders') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="fw-bold mb-0">{{ title }}</h2>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:720px;">
+  <div class="card-body p-4">
+    <form method="POST">
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Contact</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required value="{{ lender.name if lender else '' }}" placeholder="Mike Johnson" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Title</label>
+          <input type="text" name="title" class="form-control" value="{{ lender.title if lender else '' }}" placeholder="VP of Originations" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ lender.email if lender else '' }}" placeholder="mike@bridgecap.com" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ lender.phone if lender else '' }}" placeholder="(212) 555-0100" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Company / Institution</label>
+          <input type="text" name="company" class="form-control" value="{{ lender.company if lender else '' }}" placeholder="Bridge Capital Group" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Lender Type</label>
+          <select name="lender_type" class="form-select">
+            <option value="">— Select —</option>
+            {% for t in ['Bank', 'Bridge Fund', 'Debt Fund', 'Life Co', 'CMBS', 'Credit Union', 'HUD / Agency', 'Mezz / Pref Equity'] %}
+            <option value="{{ t }}" {% if lender and lender.lender_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <hr class="my-3" />
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Buy Box</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Loan Types</label>
+          <input type="text" name="loan_types" class="form-control" value="{{ lender.loan_types if lender else '' }}" placeholder="Bridge, Perm, Construction" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Asset Types</label>
+          <input type="text" name="asset_types" class="form-control" value="{{ lender.asset_types if lender else '' }}" placeholder="Multifamily, Industrial, Retail" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Min Loan Size</label>
+          <input type="text" name="min_loan" class="form-control" value="{{ lender.min_loan if lender else '' }}" placeholder="$5M" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Max Loan Size</label>
+          <input type="text" name="max_loan" class="form-control" value="{{ lender.max_loan if lender else '' }}" placeholder="$50M" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Max LTV</label>
+          <input type="text" name="max_ltv" class="form-control" value="{{ lender.max_ltv if lender else '' }}" placeholder="75%" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Typical Rate</label>
+          <input type="text" name="typical_rate" class="form-control" value="{{ lender.typical_rate if lender else '' }}" placeholder="SOFR + 300" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Origination Fee</label>
+          <input type="text" name="origination_fee" class="form-control" value="{{ lender.origination_fee if lender else '' }}" placeholder="1%" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Recourse</label>
+          <select name="recourse" class="form-select">
+            <option value="">— Select —</option>
+            {% for r in ['Full Recourse', 'Non-Recourse', 'Partial / Carve-outs'] %}
+            <option value="{{ r }}" {% if lender and lender.recourse == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Typical Term</label>
+          <input type="text" name="typical_term" class="form-control" value="{{ lender.typical_term if lender else '' }}" placeholder="3+1+1 years, 10 years" />
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Geographic Markets</label>
+          <input type="text" name="markets" class="form-control" value="{{ lender.markets if lender else '' }}" placeholder="Southeast, Sun Belt, National" />
+        </div>
+      </div>
+
+      <hr class="my-3" />
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Relationship</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['New', 'In Contact', 'Active Relationship', 'Passed'] %}
+            <option value="{{ s }}" {% if lender and lender.status == s %}selected{% elif not lender and s == 'New' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Last Contacted</label>
+          <input type="date" name="last_contacted" class="form-control" value="{{ lender.last_contacted if lender else '' }}" />
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Notes</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Relationship notes, deal history, key things they care about…">{{ lender.notes if lender else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">Save Lender</button>
+        <a href="{{ url_for('lenders') }}" class="btn btn-outline-secondary">Cancel</a>
+        {% if lender %}
+        <form method="POST" action="{{ url_for('delete_lender', lender_id=lender.id) }}"
+              class="ms-auto" onsubmit="return confirm('Delete this lender?')">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

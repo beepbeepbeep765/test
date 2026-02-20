@@ -1,7 +1,9 @@
+import csv
+import io
 import os
 import sqlite3
 from datetime import datetime, date, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
@@ -112,6 +114,53 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (deal_id) REFERENCES deals(id),
             FOREIGN KEY (contact_id) REFERENCES gp_contacts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS lp_investors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            title TEXT,
+            company TEXT,
+            email TEXT,
+            phone TEXT,
+            location TEXT,
+            net_worth TEXT,
+            preferred_asset_types TEXT,
+            preferred_markets TEXT,
+            min_check TEXT,
+            max_check TEXT,
+            hold_period_pref TEXT,
+            accredited TEXT DEFAULT 'Yes',
+            source TEXT,
+            status TEXT DEFAULT 'New',
+            notes TEXT,
+            last_contacted TEXT,
+            next_contact_date TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS lenders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            title TEXT,
+            company TEXT,
+            email TEXT,
+            phone TEXT,
+            lender_type TEXT,
+            loan_types TEXT,
+            asset_types TEXT,
+            min_loan TEXT,
+            max_loan TEXT,
+            max_ltv TEXT,
+            typical_rate TEXT,
+            recourse TEXT,
+            markets TEXT,
+            typical_term TEXT,
+            origination_fee TEXT,
+            status TEXT DEFAULT 'New',
+            notes TEXT,
+            last_contacted TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
         );
     """)
 
@@ -1204,6 +1253,250 @@ def search():
         emails=email_results,
         error=error,
     )
+
+
+# ── LP Investors ───────────────────────────────────────────────────────────────
+
+@app.route("/lp-investors")
+def lp_investors():
+    q = request.args.get("q", "").strip()
+    sf = request.args.get("status", "")
+    conn = get_db()
+    sql = "SELECT * FROM lp_investors WHERE 1=1"
+    params = []
+    if q:
+        sql += " AND (name LIKE ? OR company LIKE ? OR preferred_asset_types LIKE ? OR preferred_markets LIKE ?)"
+        params += [f"%{q}%"] * 4
+    if sf:
+        sql += " AND status = ?"
+        params.append(sf)
+    rows = conn.execute(sql + " ORDER BY created_at DESC", params).fetchall()
+    conn.close()
+    return render_template("lp_investors.html", investors=rows, q=q, status_filter=sf)
+
+
+@app.route("/lp-investors/new", methods=["GET", "POST"])
+def new_lp_investor():
+    if request.method == "POST":
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO lp_investors (name, title, company, email, phone, location, "
+            "net_worth, preferred_asset_types, preferred_markets, min_check, max_check, "
+            "hold_period_pref, accredited, source, status, notes, last_contacted, next_contact_date) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (request.form["name"], request.form.get("title", ""), request.form.get("company", ""),
+             request.form.get("email", ""), request.form.get("phone", ""), request.form.get("location", ""),
+             request.form.get("net_worth", ""), request.form.get("preferred_asset_types", ""),
+             request.form.get("preferred_markets", ""), request.form.get("min_check", ""),
+             request.form.get("max_check", ""), request.form.get("hold_period_pref", ""),
+             request.form.get("accredited", "Yes"), request.form.get("source", ""),
+             request.form.get("status", "New"), request.form.get("notes", ""),
+             request.form.get("last_contacted") or None, request.form.get("next_contact_date") or None),
+        )
+        conn.commit(); conn.close()
+        flash("LP investor added.", "success")
+        return redirect(url_for("lp_investors"))
+    return render_template("lp_investor_form.html", investor=None, title="Add LP Investor")
+
+
+@app.route("/lp-investors/<int:investor_id>")
+def lp_investor_detail(investor_id):
+    conn = get_db()
+    investor = conn.execute("SELECT * FROM lp_investors WHERE id = ?", (investor_id,)).fetchone()
+    conn.close()
+    if not investor:
+        flash("Investor not found.", "danger"); return redirect(url_for("lp_investors"))
+    return render_template("lp_investor_detail.html", investor=investor)
+
+
+@app.route("/lp-investors/<int:investor_id>/edit", methods=["GET", "POST"])
+def edit_lp_investor(investor_id):
+    conn = get_db()
+    investor = conn.execute("SELECT * FROM lp_investors WHERE id = ?", (investor_id,)).fetchone()
+    if not investor:
+        conn.close(); flash("Investor not found.", "danger"); return redirect(url_for("lp_investors"))
+    if request.method == "POST":
+        conn.execute(
+            "UPDATE lp_investors SET name=?, title=?, company=?, email=?, phone=?, location=?, "
+            "net_worth=?, preferred_asset_types=?, preferred_markets=?, min_check=?, max_check=?, "
+            "hold_period_pref=?, accredited=?, source=?, status=?, notes=?, last_contacted=?, "
+            "next_contact_date=? WHERE id=?",
+            (request.form["name"], request.form.get("title", ""), request.form.get("company", ""),
+             request.form.get("email", ""), request.form.get("phone", ""), request.form.get("location", ""),
+             request.form.get("net_worth", ""), request.form.get("preferred_asset_types", ""),
+             request.form.get("preferred_markets", ""), request.form.get("min_check", ""),
+             request.form.get("max_check", ""), request.form.get("hold_period_pref", ""),
+             request.form.get("accredited", "Yes"), request.form.get("source", ""),
+             request.form.get("status", "New"), request.form.get("notes", ""),
+             request.form.get("last_contacted") or None, request.form.get("next_contact_date") or None,
+             investor_id),
+        )
+        conn.commit(); conn.close()
+        flash("LP investor updated.", "success")
+        return redirect(url_for("lp_investor_detail", investor_id=investor_id))
+    conn.close()
+    return render_template("lp_investor_form.html", investor=investor, title="Edit LP Investor")
+
+
+@app.route("/lp-investors/<int:investor_id>/delete", methods=["POST"])
+def delete_lp_investor(investor_id):
+    conn = get_db()
+    conn.execute("DELETE FROM lp_investors WHERE id = ?", (investor_id,))
+    conn.commit(); conn.close()
+    flash("LP investor deleted.", "info")
+    return redirect(url_for("lp_investors"))
+
+
+@app.route("/lp-investors/export.csv")
+def export_lp_investors():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM lp_investors ORDER BY name").fetchall()
+    conn.close()
+    cols = ["id", "name", "title", "company", "email", "phone", "location", "net_worth",
+            "preferred_asset_types", "preferred_markets", "min_check", "max_check",
+            "hold_period_pref", "accredited", "source", "status", "notes",
+            "last_contacted", "next_contact_date", "created_at"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([r[c] for c in cols])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=lp_investors.csv"})
+
+
+# ── Lenders ────────────────────────────────────────────────────────────────────
+
+@app.route("/lenders")
+def lenders():
+    q = request.args.get("q", "").strip()
+    sf = request.args.get("status", "")
+    lt = request.args.get("lender_type", "")
+    conn = get_db()
+    sql = "SELECT * FROM lenders WHERE 1=1"
+    params = []
+    if q:
+        sql += " AND (name LIKE ? OR company LIKE ? OR asset_types LIKE ? OR markets LIKE ? OR loan_types LIKE ?)"
+        params += [f"%{q}%"] * 5
+    if sf:
+        sql += " AND status = ?"
+        params.append(sf)
+    if lt:
+        sql += " AND lender_type = ?"
+        params.append(lt)
+    rows = conn.execute(sql + " ORDER BY created_at DESC", params).fetchall()
+    conn.close()
+    return render_template("lenders.html", lenders=rows, q=q, status_filter=sf, lender_type_filter=lt)
+
+
+@app.route("/lenders/new", methods=["GET", "POST"])
+def new_lender():
+    if request.method == "POST":
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO lenders (name, title, company, email, phone, lender_type, loan_types, "
+            "asset_types, min_loan, max_loan, max_ltv, typical_rate, recourse, markets, "
+            "typical_term, origination_fee, status, notes, last_contacted) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (request.form["name"], request.form.get("title", ""), request.form.get("company", ""),
+             request.form.get("email", ""), request.form.get("phone", ""),
+             request.form.get("lender_type", ""), request.form.get("loan_types", ""),
+             request.form.get("asset_types", ""), request.form.get("min_loan", ""),
+             request.form.get("max_loan", ""), request.form.get("max_ltv", ""),
+             request.form.get("typical_rate", ""), request.form.get("recourse", ""),
+             request.form.get("markets", ""), request.form.get("typical_term", ""),
+             request.form.get("origination_fee", ""), request.form.get("status", "New"),
+             request.form.get("notes", ""), request.form.get("last_contacted") or None),
+        )
+        conn.commit(); conn.close()
+        flash("Lender added.", "success")
+        return redirect(url_for("lenders"))
+    return render_template("lender_form.html", lender=None, title="Add Lender")
+
+
+@app.route("/lenders/<int:lender_id>")
+def lender_detail(lender_id):
+    conn = get_db()
+    lender = conn.execute("SELECT * FROM lenders WHERE id = ?", (lender_id,)).fetchone()
+    conn.close()
+    if not lender:
+        flash("Lender not found.", "danger"); return redirect(url_for("lenders"))
+    return render_template("lender_detail.html", lender=lender)
+
+
+@app.route("/lenders/<int:lender_id>/edit", methods=["GET", "POST"])
+def edit_lender(lender_id):
+    conn = get_db()
+    lender = conn.execute("SELECT * FROM lenders WHERE id = ?", (lender_id,)).fetchone()
+    if not lender:
+        conn.close(); flash("Lender not found.", "danger"); return redirect(url_for("lenders"))
+    if request.method == "POST":
+        conn.execute(
+            "UPDATE lenders SET name=?, title=?, company=?, email=?, phone=?, lender_type=?, "
+            "loan_types=?, asset_types=?, min_loan=?, max_loan=?, max_ltv=?, typical_rate=?, "
+            "recourse=?, markets=?, typical_term=?, origination_fee=?, status=?, notes=?, "
+            "last_contacted=? WHERE id=?",
+            (request.form["name"], request.form.get("title", ""), request.form.get("company", ""),
+             request.form.get("email", ""), request.form.get("phone", ""),
+             request.form.get("lender_type", ""), request.form.get("loan_types", ""),
+             request.form.get("asset_types", ""), request.form.get("min_loan", ""),
+             request.form.get("max_loan", ""), request.form.get("max_ltv", ""),
+             request.form.get("typical_rate", ""), request.form.get("recourse", ""),
+             request.form.get("markets", ""), request.form.get("typical_term", ""),
+             request.form.get("origination_fee", ""), request.form.get("status", "New"),
+             request.form.get("notes", ""), request.form.get("last_contacted") or None, lender_id),
+        )
+        conn.commit(); conn.close()
+        flash("Lender updated.", "success")
+        return redirect(url_for("lender_detail", lender_id=lender_id))
+    conn.close()
+    return render_template("lender_form.html", lender=lender, title="Edit Lender")
+
+
+@app.route("/lenders/<int:lender_id>/delete", methods=["POST"])
+def delete_lender(lender_id):
+    conn = get_db()
+    conn.execute("DELETE FROM lenders WHERE id = ?", (lender_id,))
+    conn.commit(); conn.close()
+    flash("Lender deleted.", "info")
+    return redirect(url_for("lenders"))
+
+
+@app.route("/lenders/export.csv")
+def export_lenders():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM lenders ORDER BY name").fetchall()
+    conn.close()
+    cols = ["id", "name", "title", "company", "email", "phone", "lender_type", "loan_types",
+            "asset_types", "min_loan", "max_loan", "max_ltv", "typical_rate", "recourse",
+            "markets", "typical_term", "origination_fee", "status", "notes",
+            "last_contacted", "created_at"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([r[c] for c in cols])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=lenders.csv"})
+
+
+# ── GP Contacts CSV Export ─────────────────────────────────────────────────────
+
+@app.route("/contacts/export.csv")
+def export_gp_contacts():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM gp_contacts ORDER BY name").fetchall()
+    conn.close()
+    cols = ["id", "name", "title", "company", "email", "phone", "location", "aum_range",
+            "strategy", "min_check", "max_check", "source", "status", "notes",
+            "last_contacted", "next_contact_date", "created_at"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([r[c] for c in cols])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=gp_contacts.csv"})
 
 
 with app.app_context():

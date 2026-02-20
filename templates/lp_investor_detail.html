@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ investor.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('lp_investors') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h2 class="fw-bold mb-0">{{ investor.name }}</h2>
+      {% if investor.title %}<div class="text-muted">{{ investor.title }}{% if investor.company %} at {{ investor.company }}{% endif %}</div>{% endif %}
+    </div>
+  </div>
+  <a href="{{ url_for('edit_lp_investor', investor_id=investor.id) }}" class="btn btn-sm btn-outline-primary">Edit Investor</a>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Contact Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{% if investor.email %}<a href="mailto:{{ investor.email }}">{{ investor.email }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-5 text-muted">Phone</dt>
+          <dd class="col-7">{{ investor.phone or '—' }}</dd>
+          <dt class="col-5 text-muted">Company</dt>
+          <dd class="col-7">{{ investor.company or '—' }}</dd>
+          <dt class="col-5 text-muted">Location</dt>
+          <dd class="col-7">{{ investor.location or '—' }}</dd>
+          <dt class="col-5 text-muted">Accredited</dt>
+          <dd class="col-7">{{ investor.accredited or '—' }}</dd>
+          <dt class="col-5 text-muted">Status</dt>
+          <dd class="col-7">
+            <span class="badge {% if investor.status == 'Hot Lead' %}bg-danger{% elif investor.status == 'Committed' %}bg-success{% elif investor.status == 'In Contact' %}bg-primary{% elif investor.status == 'Meeting Scheduled' %}bg-info text-dark{% elif investor.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
+              {{ investor.status }}
+            </span>
+          </dd>
+          <dt class="col-5 text-muted">Last Contacted</dt>
+          <dd class="col-7">{{ investor.last_contacted or '—' }}</dd>
+          {% if investor.next_contact_date %}
+          <dt class="col-5 text-muted">Next Contact</dt>
+          <dd class="col-7"><span class="badge bg-warning text-dark">{{ investor.next_contact_date }}</span></dd>
+          {% endif %}
+          <dt class="col-5 text-muted">Source</dt>
+          <dd class="col-7">{{ investor.source or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Investment Criteria</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Asset Types</dt>
+          <dd class="col-7">{{ investor.preferred_asset_types or '—' }}</dd>
+          <dt class="col-5 text-muted">Markets</dt>
+          <dd class="col-7">{{ investor.preferred_markets or '—' }}</dd>
+          <dt class="col-5 text-muted">Net Worth / AUM</dt>
+          <dd class="col-7">{{ investor.net_worth or '—' }}</dd>
+          <dt class="col-5 text-muted">Min Check</dt>
+          <dd class="col-7">{{ investor.min_check or '—' }}</dd>
+          <dt class="col-5 text-muted">Max Check</dt>
+          <dd class="col-7">{{ investor.max_check or '—' }}</dd>
+          <dt class="col-5 text-muted">Hold Period</dt>
+          <dd class="col-7">{{ investor.hold_period_pref or '—' }}</dd>
+        </dl>
+        {% if investor.notes %}
+        <hr />
+        <div class="text-muted small fw-semibold mb-1">Notes</div>
+        <div style="white-space:pre-wrap;">{{ investor.notes }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

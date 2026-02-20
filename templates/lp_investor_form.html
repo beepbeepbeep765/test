@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('lp_investors') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="fw-bold mb-0">{{ title }}</h2>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:720px;">
+  <div class="card-body p-4">
+    <form method="POST">
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Person</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required value="{{ investor.name if investor else '' }}" placeholder="Jane Smith" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Title</label>
+          <input type="text" name="title" class="form-control" value="{{ investor.title if investor else '' }}" placeholder="Family Office Principal" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ investor.email if investor else '' }}" placeholder="jane@family.com" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ investor.phone if investor else '' }}" placeholder="(212) 555-0100" />
+        </div>
+      </div>
+
+      <hr class="my-3" />
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Firm / Entity</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Company / Fund / Family Office</label>
+          <input type="text" name="company" class="form-control" value="{{ investor.company if investor else '' }}" placeholder="Smith Family Office" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Location</label>
+          <input type="text" name="location" class="form-control" value="{{ investor.location if investor else '' }}" placeholder="Miami, FL" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Net Worth / AUM</label>
+          <input type="text" name="net_worth" class="form-control" value="{{ investor.net_worth if investor else '' }}" placeholder="$10M–$50M" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Accredited Investor</label>
+          <select name="accredited" class="form-select">
+            {% for opt in ['Yes', 'No', 'Pending Verification'] %}
+            <option value="{{ opt }}" {% if investor and investor.accredited == opt %}selected{% elif not investor and opt == 'Yes' %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <hr class="my-3" />
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Investment Criteria</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Preferred Asset Types</label>
+          <input type="text" name="preferred_asset_types" class="form-control" value="{{ investor.preferred_asset_types if investor else '' }}" placeholder="Multifamily, Industrial" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Preferred Markets</label>
+          <input type="text" name="preferred_markets" class="form-control" value="{{ investor.preferred_markets if investor else '' }}" placeholder="Sun Belt, Southeast" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Min Check Size</label>
+          <input type="text" name="min_check" class="form-control" value="{{ investor.min_check if investor else '' }}" placeholder="$250K" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Max Check Size</label>
+          <input type="text" name="max_check" class="form-control" value="{{ investor.max_check if investor else '' }}" placeholder="$2M" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Preferred Hold Period</label>
+          <input type="text" name="hold_period_pref" class="form-control" value="{{ investor.hold_period_pref if investor else '' }}" placeholder="3–5 years" />
+        </div>
+      </div>
+
+      <hr class="my-3" />
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 small">Relationship</h6>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Hot Lead', 'Committed', 'Passed'] %}
+            <option value="{{ s }}" {% if investor and investor.status == s %}selected{% elif not investor and s == 'New' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Last Contacted</label>
+          <input type="date" name="last_contacted" class="form-control" value="{{ investor.last_contacted if investor else '' }}" />
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold">Next Contact Reminder</label>
+          <input type="date" name="next_contact_date" class="form-control" value="{{ investor.next_contact_date if investor else '' }}" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-semibold">Source</label>
+          <input type="text" name="source" class="form-control" value="{{ investor.source if investor else '' }}" placeholder="Referral, event, LinkedIn…" />
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Notes</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Investment preferences, relationship notes, key deals they've done…">{{ investor.notes if investor else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">Save Investor</button>
+        <a href="{{ url_for('lp_investors') }}" class="btn btn-outline-secondary">Cancel</a>
+        {% if investor %}
+        <form method="POST" action="{{ url_for('delete_lp_investor', investor_id=investor.id) }}"
+              class="ms-auto" onsubmit="return confirm('Delete this investor?')">
+          <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Lenders — ACRE CRM{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">Lenders</h2>
+    <span class="text-muted small">Debt capital sources and buy box tracker</span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('export_lenders') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+    <a href="{{ url_for('new_lender') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Add Lender
+    </a>
+  </div>
+</div>
+
+<form method="GET" class="d-flex gap-2 mb-3 flex-wrap">
+  <div class="input-group" style="max-width:300px;">
+    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+    <input type="text" name="q" class="form-control border-start-0 ps-0"
+           placeholder="Name, firm, asset type, market…" value="{{ q }}" />
+  </div>
+  <select name="lender_type" class="form-select" style="max-width:180px;">
+    <option value="">All Types</option>
+    {% for t in ['Bank', 'Bridge Fund', 'Debt Fund', 'Life Co', 'CMBS', 'Credit Union', 'HUD / Agency', 'Mezz / Pref Equity'] %}
+    <option value="{{ t }}" {% if lender_type_filter == t %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" class="form-select" style="max-width:180px;">
+    <option value="">All Statuses</option>
+    {% for s in ['New', 'In Contact', 'Active Relationship', 'Passed'] %}
+    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-outline-secondary">Filter</button>
+  {% if q or status_filter or lender_type_filter %}
+  <a href="{{ url_for('lenders') }}" class="btn btn-outline-danger">Clear</a>
+  {% endif %}
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if lenders %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Name / Title</th>
+            <th>Firm</th>
+            <th>Type</th>
+            <th>Loan Size</th>
+            <th>Max LTV</th>
+            <th>Asset Types</th>
+            <th>Markets</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lenders %}
+          <tr>
+            <td>
+              <a href="{{ url_for('lender_detail', lender_id=l.id) }}" class="text-decoration-none fw-semibold">{{ l.name }}</a>
+              {% if l.title %}<div class="text-muted small">{{ l.title }}</div>{% endif %}
+            </td>
+            <td>{{ l.company or '—' }}</td>
+            <td><span class="badge bg-light text-dark border">{{ l.lender_type or '—' }}</span></td>
+            <td class="text-muted small text-nowrap">
+              {% if l.min_loan or l.max_loan %}{{ l.min_loan or '' }}{% if l.min_loan and l.max_loan %}–{% endif %}{{ l.max_loan or '' }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ l.max_ltv or '—' }}</td>
+            <td class="text-muted small">{{ l.asset_types or '—' }}</td>
+            <td class="text-muted small">{{ l.markets or '—' }}</td>
+            <td>
+              <span class="badge {% if l.status == 'Active Relationship' %}bg-success{% elif l.status == 'In Contact' %}bg-primary{% elif l.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
+                {{ l.status }}
+              </span>
+            </td>
+            <td>
+              <a href="{{ url_for('lender_detail', lender_id=l.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-3 py-2 text-muted small border-top">{{ lenders|length }} lender{{ 's' if lenders|length != 1 }}</div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-bank fs-1 d-block mb-2"></i>
+      {% if q or status_filter or lender_type_filter %}
+        No lenders match your search.
+      {% else %}
+        No lenders yet. <a href="{{ url_for('new_lender') }}">Add your first one.</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

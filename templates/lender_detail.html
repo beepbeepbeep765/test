@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ lender.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('lenders') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h2 class="fw-bold mb-0">{{ lender.name }}</h2>
+      {% if lender.title %}<div class="text-muted">{{ lender.title }}{% if lender.company %} at {{ lender.company }}{% endif %}</div>{% endif %}
+    </div>
+  </div>
+  <a href="{{ url_for('edit_lender', lender_id=lender.id) }}" class="btn btn-sm btn-outline-primary">Edit Lender</a>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Contact Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{% if lender.email %}<a href="mailto:{{ lender.email }}">{{ lender.email }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-5 text-muted">Phone</dt>
+          <dd class="col-7">{{ lender.phone or '—' }}</dd>
+          <dt class="col-5 text-muted">Company</dt>
+          <dd class="col-7">{{ lender.company or '—' }}</dd>
+          <dt class="col-5 text-muted">Lender Type</dt>
+          <dd class="col-7">{% if lender.lender_type %}<span class="badge bg-light text-dark border">{{ lender.lender_type }}</span>{% else %}—{% endif %}</dd>
+          <dt class="col-5 text-muted">Status</dt>
+          <dd class="col-7">
+            <span class="badge {% if lender.status == 'Active Relationship' %}bg-success{% elif lender.status == 'In Contact' %}bg-primary{% elif lender.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
+              {{ lender.status }}
+            </span>
+          </dd>
+          <dt class="col-5 text-muted">Last Contacted</dt>
+          <dd class="col-7">{{ lender.last_contacted or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold py-3">Buy Box</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Loan Types</dt>
+          <dd class="col-7">{{ lender.loan_types or '—' }}</dd>
+          <dt class="col-5 text-muted">Asset Types</dt>
+          <dd class="col-7">{{ lender.asset_types or '—' }}</dd>
+          <dt class="col-5 text-muted">Loan Size</dt>
+          <dd class="col-7">
+            {% if lender.min_loan or lender.max_loan %}{{ lender.min_loan or '' }}{% if lender.min_loan and lender.max_loan %}–{% endif %}{{ lender.max_loan or '' }}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-5 text-muted">Max LTV</dt>
+          <dd class="col-7">{{ lender.max_ltv or '—' }}</dd>
+          <dt class="col-5 text-muted">Typical Rate</dt>
+          <dd class="col-7">{{ lender.typical_rate or '—' }}</dd>
+          <dt class="col-5 text-muted">Origination Fee</dt>
+          <dd class="col-7">{{ lender.origination_fee or '—' }}</dd>
+          <dt class="col-5 text-muted">Recourse</dt>
+          <dd class="col-7">{{ lender.recourse or '—' }}</dd>
+          <dt class="col-5 text-muted">Typical Term</dt>
+          <dd class="col-7">{{ lender.typical_term or '—' }}</dd>
+          <dt class="col-5 text-muted">Markets</dt>
+          <dd class="col-7">{{ lender.markets or '—' }}</dd>
+        </dl>
+        {% if lender.notes %}
+        <hr />
+        <div class="text-muted small fw-semibold mb-1">Notes</div>
+        <div style="white-space:pre-wrap;">{{ lender.notes }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

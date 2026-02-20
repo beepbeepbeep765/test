@@ -44,10 +44,16 @@
             <i class="bi bi-building me-1"></i>Deals
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link rounded px-3 {% if 'contact' in (request.endpoint or '') %}active bg-white bg-opacity-10{% endif %}" href="{{ url_for('contacts') }}">
-            <i class="bi bi-people me-1"></i>GP Contacts
+        <li class="nav-item dropdown">
+          <a class="nav-link rounded px-3 dropdown-toggle {% if 'contact' in (request.endpoint or '') or 'lp_investor' in (request.endpoint or '') or 'lender' in (request.endpoint or '') %}active bg-white bg-opacity-10{% endif %}"
+             href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-people me-1"></i>Contacts
           </a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('contacts') }}"><i class="bi bi-building me-2 text-muted"></i>GP Contacts</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('lp_investors') }}"><i class="bi bi-person-circle me-2 text-muted"></i>LP Investors</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('lenders') }}"><i class="bi bi-bank me-2 text-muted"></i>Lenders</a></li>
+          </ul>
         </li>
         <li class="nav-item">
           <a class="nav-link rounded px-3 {% if request.endpoint == 'activity' %}active bg-white bg-opacity-10{% endif %}" href="{{ url_for('activity') }}">
