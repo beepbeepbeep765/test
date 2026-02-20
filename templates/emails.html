@@ -3,187 +3,256 @@
 {% block content %}
 
 <style>
-.ep { color: #1e293b; }
-.ep h4, .ep strong { color: #0f172a; }
-.ep small, .ep .ep-muted { color: #64748b !important; }
+/* ── Outlook-style email pane ──────────────────────────────────────── */
+.eml-wrap { display:flex; gap:0; height:calc(100vh - 120px); min-height:500px; }
 
-/* Search / filter bar */
-.ep .form-control, .ep .form-select {
-  background: #fff !important; border-color: #d1d5db !important; color: #1e293b !important;
+/* Left column: list */
+.eml-list-col {
+  width:380px; flex-shrink:0;
+  background:#fff;
+  border:1px solid #dde1e7;
+  border-radius:8px 0 0 8px;
+  display:flex; flex-direction:column;
+  overflow:hidden;
 }
-.ep .form-control::placeholder { color: #9ca3af !important; }
-.ep .form-control:focus, .ep .form-select:focus {
-  background: #fff !important; border-color: #c9a84c !important;
-  box-shadow: 0 0 0 3px rgba(201,168,76,.15) !important; color: #1e293b !important;
+.eml-list-header {
+  padding:10px 14px 8px;
+  border-bottom:1px solid #edf0f4;
+  background:#f3f6fb;
 }
-.ep .input-group-text {
-  background: #f9fafb !important; border-color: #d1d5db !important; color: #6b7280 !important;
-}
+.eml-list-header h5 { font-size:.88rem; font-weight:700; color:#1a1a2e; margin:0 0 6px; }
 
-/* Email rows — Outlook-style */
-.email-list { background:#fff; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }
-.email-row {
-  display:flex; align-items:flex-start; gap:12px;
-  padding:11px 16px; border-bottom:1px solid #f1f5f9;
+.eml-search {
+  display:flex; gap:6px;
+}
+.eml-search input {
+  flex:1; font-size:.8rem; padding:5px 10px;
+  border:1px solid #d0d5dd; border-radius:6px;
+  background:#fff; color:#1a1a2e; outline:none;
+}
+.eml-search input:focus { border-color:#0078d4; box-shadow:0 0 0 2px rgba(0,120,212,.15); }
+.eml-search input::placeholder { color:#9ca3af; }
+
+.eml-filters {
+  display:flex; gap:5px; margin-top:6px; flex-wrap:wrap;
+}
+.eml-filter-btn {
+  font-size:.72rem; padding:2px 9px; border-radius:12px;
+  border:1px solid #d0d5dd; background:#fff; color:#374151; cursor:pointer;
+  text-decoration:none; transition:all .1s;
+}
+.eml-filter-btn:hover { background:#e8f0fd; border-color:#0078d4; color:#0078d4; }
+.eml-filter-btn.active { background:#0078d4; border-color:#0078d4; color:#fff; }
+
+.eml-count { font-size:.7rem; color:#6b7280; margin-top:5px; }
+
+/* Email row */
+.eml-list { overflow-y:auto; flex:1; }
+.eml-row {
+  display:block; padding:10px 14px;
+  border-bottom:1px solid #f0f2f5;
   text-decoration:none; color:inherit;
-  transition: background .1s;
+  cursor:pointer; transition:background .1s;
+  border-left:3px solid transparent;
 }
-.email-row:last-child { border-bottom:none; }
-.email-row:hover { background:#f8fafc; }
+.eml-row:hover { background:#f3f6fb; }
+.eml-row.active { background:#e8f0fd; border-left-color:#0078d4; }
 
-.email-dir-icon {
-  flex-shrink:0; margin-top:3px;
-  width:28px; height:28px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:.75rem;
+.eml-row-top { display:flex; justify-content:space-between; align-items:baseline; gap:4px; margin-bottom:1px; }
+.eml-row-who { font-size:.8rem; font-weight:600; color:#1a1a2e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
+.eml-row-date { font-size:.7rem; color:#9ca3af; white-space:nowrap; flex-shrink:0; }
+.eml-row-subject { font-size:.78rem; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:2px; }
+.eml-row-preview { font-size:.72rem; color:#9ca3af; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.eml-row-badges { display:flex; gap:3px; margin-top:3px; flex-wrap:wrap; }
+.eml-badge-deal    { font-size:.62rem; padding:.1em .4em; border-radius:3px; background:rgba(201,168,76,.18); color:#92740e; border:1px solid rgba(201,168,76,.3); font-weight:600; }
+.eml-badge-contact { font-size:.62rem; padding:.1em .4em; border-radius:3px; background:rgba(16,163,74,.1); color:#166534; border:1px solid rgba(16,163,74,.2); font-weight:600; }
+
+/* Right column: reading pane */
+.eml-reading-col {
+  flex:1; min-width:0;
+  background:#fff;
+  border:1px solid #dde1e7; border-left:none;
+  border-radius:0 8px 8px 0;
+  display:flex; flex-direction:column;
+  overflow:hidden;
 }
-.email-dir-icon.sent     { background:rgba(201,168,76,.15); color:#92740e; }
-.email-dir-icon.received { background:rgba(10,140,170,.12); color:#0e7490; }
+.eml-reading-toolbar {
+  padding:10px 18px;
+  border-bottom:1px solid #edf0f4;
+  background:#f3f6fb;
+  display:flex; align-items:center; gap:8px;
+  flex-wrap:wrap;
+}
+.eml-reading-toolbar .btn { font-size:.75rem; padding:3px 10px; }
+.eml-reading-body { flex:1; overflow-y:auto; padding:20px 24px; }
 
-.email-main { flex:1; min-width:0; }
-.email-top  { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:1px; }
+.eml-subject-line { font-size:1.05rem; font-weight:700; color:#1a1a2e; margin-bottom:10px; }
+.eml-meta { font-size:.78rem; color:#6b7280; margin-bottom:14px; line-height:1.8; }
+.eml-meta strong { color:#374151; }
+.eml-divider { border:none; border-top:1px solid #edf0f4; margin:14px 0; }
+.eml-body-text { font-size:.85rem; color:#374151; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+.eml-empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
+.eml-empty-state i { font-size:2.5rem; display:block; margin-bottom:8px; }
 
-.email-who  { font-size:.82rem; font-weight:600; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
-.email-date { font-size:.75rem; color:#9ca3af; white-space:nowrap; flex-shrink:0; }
-.email-subject { font-size:.875rem; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
-.email-preview { font-size:.78rem; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-.email-badges { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; }
-.ebadge-deal    { font-size:.68rem; padding:.15em .5em; border-radius:4px; background:rgba(201,168,76,.18); color:#92740e; border:1px solid rgba(201,168,76,.35); font-weight:600; text-decoration:none; }
-.ebadge-contact { font-size:.68rem; padding:.15em .5em; border-radius:4px; background:rgba(25,135,84,.12); color:#166534; border:1px solid rgba(25,135,84,.25); font-weight:600; text-decoration:none; }
-.ebadge-tag     { font-size:.68rem; padding:.15em .5em; border-radius:4px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+/* Sync bar */
+.eml-sync-bar {
+  padding:8px 14px;
+  border-top:1px solid #edf0f4;
+  background:#f9fafb;
+  display:flex; align-items:center; gap:8px;
+  flex-wrap:wrap;
+}
+.eml-sync-bar select, .eml-sync-bar .form-check-label { font-size:.75rem; }
+.eml-sync-bar select { padding:3px 8px; border:1px solid #d0d5dd; border-radius:5px; background:#fff; color:#374151; }
 </style>
 
-<div class="ep">
+<div class="eml-wrap">
 
-<div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
-  <div>
-    <h4 class="fw-bold mb-0">Email Archive</h4>
-    <small>{{ total }} email{{ 's' if total != 1 }} synced from Outlook</small>
-  </div>
-  <form method="POST" action="{{ url_for('sync_emails') }}" class="d-flex align-items-center gap-2 flex-wrap">
-    <select name="days" class="form-select form-select-sm" style="width:130px">
-      <option value="1">Today only</option>
-      <option value="7">Last 7 days</option>
-      <option value="30" selected>Last 30 days</option>
-      <option value="90">Last 90 days</option>
-    </select>
-    <div class="form-check form-check-inline mb-0">
-      <input class="form-check-input" type="checkbox" name="include_inbox" value="1" id="inc_inbox" checked>
-      <label class="form-check-label small" for="inc_inbox" style="color:#374151;">Inbox too</label>
-    </div>
-    <button type="submit" class="btn btn-primary btn-sm">
-      <i class="bi bi-arrow-clockwise me-1"></i>Sync Outlook
-    </button>
-  </form>
-</div>
-
-{% if total == 0 %}
-<div class="card border-0 shadow-sm mb-4" style="background:#fff;">
-  <div class="card-body p-4">
-    <h5 class="fw-semibold mb-3">How to connect Outlook</h5>
-    <ol class="ps-3" style="color:#374151;font-size:.9rem;line-height:2;">
-      <li>Make sure Outlook is open and logged in.</li>
-      <li>Select a date range above and click <strong>Sync Outlook</strong>.</li>
-      <li>Emails sync locally — nothing leaves your machine.</li>
-    </ol>
-  </div>
-</div>
-{% endif %}
-
-<!-- Search & Filters -->
-<form method="GET" class="mb-3">
-  <div class="row g-2">
-    <div class="col-md-5">
-      <div class="input-group">
-        <span class="input-group-text"><i class="bi bi-search"></i></span>
-        <input type="text" name="q" class="form-control"
-               placeholder="Search subject, sender, body…" value="{{ q }}" autofocus />
-      </div>
-    </div>
-    <div class="col-md-2">
-      <select name="deal_id" class="form-select">
-        <option value="">All Deals</option>
+  <!-- LEFT: Email List -->
+  <div class="eml-list-col">
+    <div class="eml-list-header">
+      <h5><i class="bi bi-envelope me-1" style="color:#0078d4;"></i>Email Archive
+        <span style="font-weight:400;color:#6b7280;font-size:.75rem;margin-left:6px;">{{ total }} synced</span>
+      </h5>
+      <!-- Search -->
+      <form method="GET" action="{{ url_for('emails') }}" class="eml-search">
+        <input type="text" name="q" placeholder="Search…" value="{{ q }}" />
+        <input type="hidden" name="deal_id"   value="{{ deal_filter }}" />
+        <input type="hidden" name="direction" value="{{ direction_filter }}" />
+      </form>
+      <!-- Direction filters -->
+      <div class="eml-filters">
+        <a href="{{ url_for('emails', q=q) }}"
+           class="eml-filter-btn {% if not direction_filter %}active{% endif %}">All</a>
+        <a href="{{ url_for('emails', q=q, direction='sent') }}"
+           class="eml-filter-btn {% if direction_filter=='sent' %}active{% endif %}">Sent</a>
+        <a href="{{ url_for('emails', q=q, direction='received') }}"
+           class="eml-filter-btn {% if direction_filter=='received' %}active{% endif %}">Inbox</a>
         {% for d in deals %}
-          <option value="{{ d.id }}" {% if deal_filter == d.id|string %}selected{% endif %}>{{ d.name }}</option>
+        <a href="{{ url_for('emails', q=q, deal_id=d.id) }}"
+           class="eml-filter-btn {% if deal_filter==d.id|string %}active{% endif %}">{{ d.name }}</a>
         {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="direction" class="form-select">
-        <option value="">Sent + Inbox</option>
-        <option value="sent"     {% if direction_filter == 'sent'     %}selected{% endif %}>Sent only</option>
-        <option value="received" {% if direction_filter == 'received' %}selected{% endif %}>Inbox only</option>
-      </select>
-    </div>
-    <div class="col-md-1">
-      <input type="date" name="date_from" class="form-control" value="{{ date_from }}" title="From date" />
-    </div>
-    <div class="col-md-1">
-      <input type="date" name="date_to" class="form-control" value="{{ date_to }}" title="To date" />
-    </div>
-    <div class="col-auto d-flex gap-1">
-      <button type="submit" class="btn btn-outline-secondary btn-sm px-3">Search</button>
-      {% if q or deal_filter or direction_filter or date_from or date_to or tag_filter %}
-        <a href="{{ url_for('emails') }}" class="btn btn-outline-secondary btn-sm px-3">Clear</a>
+      </div>
+      {% if emails %}
+      <div class="eml-count">{{ emails|length }} message{{ 's' if emails|length != 1 }}{% if q %} for "{{ q }}"{% endif %}</div>
       {% endif %}
     </div>
+
+    <div class="eml-list" id="emailList">
+      {% if emails %}
+        {% for e in emails %}
+        <a href="{{ url_for('email_detail', email_id=e.id) }}"
+           class="eml-row {% if loop.first %}active{% endif %}"
+           data-id="{{ e.id }}"
+           onclick="loadEmail(event, this, '{{ url_for('email_detail', email_id=e.id) }}')">
+          <div class="eml-row-top">
+            <span class="eml-row-who">
+              {% if e.direction == 'received' %}{{ e.from_addr or '—' }}{% else %}To: {{ e.to_addr or '—' }}{% endif %}
+            </span>
+            <span class="eml-row-date">{{ e.sent_on }}</span>
+          </div>
+          <div class="eml-row-subject">{{ e.subject or '(no subject)' }}</div>
+          <div class="eml-row-preview">{{ (e.body or '')[:90] | replace('\n',' ') | replace('\r','') }}</div>
+          {% if e.deal_name or e.gp_name %}
+          <div class="eml-row-badges">
+            {% if e.deal_name %}<span class="eml-badge-deal">{{ e.deal_name }}</span>{% endif %}
+            {% if e.gp_name  %}<span class="eml-badge-contact">{{ e.gp_name }}</span>{% endif %}
+          </div>
+          {% endif %}
+        </a>
+        {% endfor %}
+      {% elif total == 0 %}
+        <div style="padding:30px 16px; font-size:.82rem; color:#6b7280;">
+          No emails synced yet.<br><br>
+          Make sure Outlook is open, select a date range below, and click <strong>Sync</strong>.
+        </div>
+      {% else %}
+        <div style="padding:30px 16px; font-size:.82rem; color:#6b7280;">
+          No emails match. <a href="{{ url_for('emails') }}" style="color:#0078d4;">Clear filters</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Sync controls at bottom -->
+    <form method="POST" action="{{ url_for('sync_emails') }}" class="eml-sync-bar">
+      <select name="days">
+        <option value="1">Today only</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input" type="checkbox" name="include_inbox" value="1" id="inc_inbox" checked style="width:13px;height:13px;">
+        <label class="form-check-label" for="inc_inbox" style="font-size:.73rem;color:#374151;margin-left:4px;">Inbox too</label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="font-size:.73rem;padding:3px 10px;">
+        <i class="bi bi-arrow-clockwise"></i> Sync Outlook
+      </button>
+    </form>
   </div>
-</form>
 
-{% if emails %}
-<div class="small ep-muted mb-2">{{ emails|length }} result{{ 's' if emails|length != 1 }}{% if q %} for "<strong style="color:#111;">{{ q }}</strong>"{% endif %}</div>
-
-<div class="email-list">
-  {% for e in emails %}
-  <a href="{{ url_for('email_detail', email_id=e.id) }}" class="email-row">
-
-    <div class="email-dir-icon {{ 'received' if e.direction == 'received' else 'sent' }}">
-      <i class="bi {{ 'bi-inbox' if e.direction == 'received' else 'bi-send' }}"></i>
-    </div>
-
-    <div class="email-main">
-      <div class="email-top">
-        <span class="email-who">
-          {% if e.direction == 'received' %}{{ e.from_addr or '—' }}{% else %}To: {{ e.to_addr or '—' }}{% endif %}
-        </span>
-        <span class="email-date">{{ e.sent_on }}</span>
+  <!-- RIGHT: Reading Pane -->
+  <div class="eml-reading-col" id="readingPane">
+    {% if emails %}
+      {% set e = emails[0] %}
+      <div class="eml-reading-toolbar">
+        <a href="{{ url_for('email_detail', email_id=e.id) }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-box-arrow-up-right"></i> Full Page
+        </a>
+        {% if not e.deal_id %}
+        <a href="{{ url_for('email_detail', email_id=e.id) }}#link-deal" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-link-45deg"></i> Link to Deal
+        </a>
+        {% endif %}
+        <a href="{{ url_for('new_outreach', deal_id=e.deal_id or 0) if e.deal_id else url_for('email_detail', email_id=e.id) }}"
+           class="btn btn-primary btn-sm">
+          <i class="bi bi-plus"></i> Log as Outreach
+        </a>
       </div>
-      <div class="email-subject">{{ e.subject or '(no subject)' }}</div>
-      {% if e.body %}
-      <div class="email-preview">{{ e.body[:140] | replace('\n', ' ') | replace('\r', '') }}</div>
-      {% endif %}
-      {% if e.deal_name or e.gp_name or e.tags %}
-      <div class="email-badges">
-        {% if e.deal_name %}
-          <span class="ebadge-deal">{{ e.deal_name }}</span>
-        {% endif %}
-        {% if e.gp_name %}
-          <span class="ebadge-contact">{{ e.gp_name }}</span>
-        {% endif %}
-        {% if e.tags %}
-          {% for t in e.tags.split(',') %}
-            <span class="ebadge-tag">{{ t.strip() }}</span>
-          {% endfor %}
-        {% endif %}
+      <div class="eml-reading-body" id="readingBody">
+        <div class="eml-subject-line">{{ e.subject or '(no subject)' }}</div>
+        <div class="eml-meta">
+          <strong>From:</strong> {{ e.from_addr or '—' }}<br>
+          <strong>To:</strong> {{ e.to_addr or '—' }}<br>
+          {% if e.cc_addr %}<strong>CC:</strong> {{ e.cc_addr }}<br>{% endif %}
+          <strong>Date:</strong> {{ e.sent_on }}<br>
+          {% if e.deal_name %}<strong>Deal:</strong>
+            <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" style="color:#0078d4;">{{ e.deal_name }}</a><br>
+          {% endif %}
+          {% if e.gp_name %}<strong>Contact:</strong>
+            <a href="{{ url_for('contact_detail', contact_id=e.contact_id) }}" style="color:#0078d4;">{{ e.gp_name }}</a>
+          {% endif %}
+        </div>
+        <hr class="eml-divider">
+        <div class="eml-body-text">{{ e.body or '(no body)' }}</div>
       </div>
-      {% endif %}
-    </div>
-
-  </a>
-  {% endfor %}
-</div>
-
-{% elif q or deal_filter or direction_filter or date_from or date_to or tag_filter %}
-<div class="text-center py-5 ep-muted">
-  <i class="bi bi-search fs-1 d-block mb-2"></i>No emails match your search.
-</div>
-
-{% elif total > 0 %}
-<div class="text-center py-5 ep-muted">
-  All {{ total }} emails synced. Use the search bar above to find anything.
-</div>
-{% endif %}
+    {% else %}
+      <div class="eml-empty-state">
+        <i class="bi bi-envelope"></i>
+        Select an email to read it here
+      </div>
+    {% endif %}
+  </div>
 
 </div>
+
+<script>
+function loadEmail(evt, row, url) {
+  evt.preventDefault();
+  document.querySelectorAll('.eml-row').forEach(r => r.classList.remove('active'));
+  row.classList.add('active');
+  fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(r => r.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const body = doc.querySelector('#readingBody');
+      const toolbar = doc.querySelector('.eml-reading-toolbar');
+      if (body) document.getElementById('readingBody').innerHTML = body.innerHTML;
+      if (toolbar) document.querySelector('.eml-reading-toolbar').innerHTML = toolbar.innerHTML;
+    })
+    .catch(() => { window.location.href = url; });
+}
+</script>
+
 {% endblock %}

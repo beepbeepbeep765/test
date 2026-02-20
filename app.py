@@ -920,13 +920,18 @@ def sync_emails():
                 rows = []
                 # Use start of the cutoff day so "Today only" includes all of today
                 cutoff_day = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
-                cutoff_str = cutoff_day.strftime("%m/%d/%Y %H:%M %p")
+                # %I = 12-hour clock (so midnight = "12:00 AM" not "00:00 AM" which Outlook rejects)
+                cutoff_str = cutoff_day.strftime("%m/%d/%Y %I:%M %p")
 
                 def _collect_folder(folder, direction):
                     try:
                         items = folder.Items
-                        # Ask Outlook to pre-filter by date — much faster than scanning everything
                         date_field = "[SentOn]" if direction == "sent" else "[ReceivedTime]"
+                        # Sort newest-first before filtering so recent emails always come first
+                        try:
+                            items.Sort(date_field, True)
+                        except Exception:
+                            pass
                         try:
                             items = items.Restrict(f"{date_field} >= '{cutoff_str}'")
                         except Exception:
