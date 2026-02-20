@@ -63,9 +63,9 @@
   </div>
   <form method="POST" action="{{ url_for('sync_emails') }}" class="d-flex align-items-center gap-2 flex-wrap">
     <select name="days" class="form-select form-select-sm" style="width:130px">
-      <option value="1" selected>Today only</option>
+      <option value="1">Today only</option>
       <option value="7">Last 7 days</option>
-      <option value="30">Last 30 days</option>
+      <option value="30" selected>Last 30 days</option>
       <option value="90">Last 90 days</option>
     </select>
     <div class="form-check form-check-inline mb-0">
