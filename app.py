@@ -836,11 +836,24 @@ def emails():
             )
             rows = [item for item, _score in results]
         except Exception:
-            # Fall back to basic keyword search if semantic search unavailable
-            kw = q.lower()
-            rows = [r for r in rows if kw in (r["subject"] or "").lower()
-                    or kw in (r["from_addr"] or "").lower()
-                    or kw in (r["to_addr"] or "").lower()]
+            # Fallback keyword search — handles "auto camp" matching "autocamp" etc.
+            kw = q.lower().strip()
+            kw_nospace = kw.replace(" ", "")
+            words = [w for w in kw.split() if len(w) > 1]
+
+            def _email_matches(r):
+                fields = " ".join(filter(None, [
+                    (r["subject"] or "").lower(),
+                    (r["from_addr"] or "").lower(),
+                    (r["to_addr"] or "").lower(),
+                    (r["body"] or "")[:500].lower(),
+                ]))
+                fields_nospace = fields.replace(" ", "")
+                return (kw in fields
+                        or kw_nospace in fields_nospace
+                        or (len(words) > 1 and all(w in fields for w in words)))
+
+            rows = [r for r in rows if _email_matches(r)]
     deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
     contacts = conn.execute("SELECT id, name FROM gp_contacts ORDER BY name").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
