@@ -2,10 +2,77 @@
 {% block title %}Email Archive — ACRE CRM{% endblock %}
 {% block content %}
 
+<style>
+/* ── Email page: white light theme ─────────────────────────────── */
+.ep { color: #1e293b; }
+.ep h4, .ep h5, .ep strong { color: #0f172a; }
+.ep small, .ep .ep-muted { color: #64748b !important; }
+.ep .card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+.ep .form-control,
+.ep .form-select {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+.ep .form-control::placeholder { color: #94a3b8 !important; }
+.ep .form-control:focus,
+.ep .form-select:focus {
+  background: #fff !important;
+  border-color: #c9a84c !important;
+  box-shadow: 0 0 0 3px rgba(201,168,76,.15) !important;
+  color: #1e293b !important;
+}
+.ep .form-select option { background: #fff; color: #1e293b; }
+.ep .input-group-text {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+}
+.ep .table {
+  color: #1e293b !important;
+  --bs-table-bg: #ffffff;
+  --bs-table-hover-bg: #f8fafc;
+  --bs-table-border-color: #e2e8f0;
+}
+.ep .table td, .ep .table th {
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+.ep .table thead th {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+.ep .table tbody tr:last-child td { border-bottom: none; }
+.ep .table a { color: #1e293b !important; }
+.ep .table a:hover { color: #c9a84c !important; }
+.ep .subject-link { color: #0f172a !important; font-weight: 600; }
+.ep .subject-link:hover { color: #c9a84c !important; }
+.ep .btn-outline-primary  { border-color: #c9a84c; color: #92740e; }
+.ep .btn-outline-primary:hover { background: #fdf8ec; color: #92740e; border-color: #c9a84c; }
+.ep .btn-outline-secondary { border-color: #cbd5e1; color: #475569; }
+.ep .btn-outline-secondary:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; }
+.ep .setup-step {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+.ep .setup-step code { background: #fdf8ec; color: #92740e; }
+.ep .alert-light { background: #f8fafc !important; color: #475569 !important; border-color: #e2e8f0 !important; }
+.ep .badge.bg-light { background: #e2e8f0 !important; color: #475569 !important; }
+.ep .text-muted { color: #64748b !important; }
+</style>
+
+<div class="ep">
+
 <div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
   <div>
-    <h4 class="fw-bold mb-0"><i class="bi bi-envelope me-2 text-primary"></i>Email Archive</h4>
-    <small class="text-muted">{{ total }} email{{ 's' if total != 1 }} synced from Outlook</small>
+    <h4 class="fw-bold mb-0"><i class="bi bi-envelope me-2" style="color:#c9a84c;"></i>Email Archive</h4>
+    <small class="ep-muted">{{ total }} email{{ 's' if total != 1 }} synced from Outlook</small>
   </div>
   <!-- Sync Controls -->
   <form method="POST" action="{{ url_for('sync_emails') }}" class="d-flex align-items-center gap-2 flex-wrap">
@@ -17,7 +84,7 @@
     </select>
     <div class="form-check form-check-inline mb-0 ms-1">
       <input class="form-check-input" type="checkbox" name="include_inbox" value="1" id="inc_inbox" checked>
-      <label class="form-check-label small" for="inc_inbox">Inbox too</label>
+      <label class="form-check-label small" for="inc_inbox" style="color:#1e293b;">Inbox too</label>
     </div>
     <button type="submit" class="btn btn-primary btn-sm">
       <i class="bi bi-arrow-clockwise me-1"></i>Sync Outlook
@@ -29,7 +96,7 @@
 {% if total == 0 %}
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-4">
-    <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down me-2 text-primary"></i>How to connect Outlook</h5>
+    <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down me-2" style="color:#c9a84c;"></i>How to connect Outlook</h5>
     <div class="setup-step">
       <strong>Step 1.</strong> Open a Command Prompt (<code>Win + R</code> → type <code>cmd</code> → Enter).
     </div>
@@ -56,7 +123,7 @@
   <div class="row g-2">
     <div class="col-md-5">
       <div class="input-group">
-        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <span class="input-group-text border-end-0"><i class="bi bi-search"></i></span>
         <input type="text" name="q" class="form-control border-start-0 ps-0"
                placeholder="Search subject, body, sender, recipient…" value="{{ q }}" autofocus />
       </div>
@@ -92,9 +159,11 @@
   <!-- Tag chips -->
   {% if all_tags %}
   <div class="d-flex gap-1 mt-2 flex-wrap align-items-center">
-    <span class="text-muted small me-1">Tags:</span>
+    <span class="ep-muted small me-1">Tags:</span>
     {% for t in all_tags %}
-    <a href="{{ url_for('emails', tag=t) }}" class="badge {% if tag_filter == t %}bg-primary{% else %}bg-light text-dark border{% endif %} text-decoration-none">{{ t }}</a>
+    <a href="{{ url_for('emails', tag=t) }}"
+       class="badge text-decoration-none"
+       style="{% if tag_filter == t %}background:#c9a84c;color:#0a0f1a;{% else %}background:#e2e8f0;color:#475569;{% endif %}">{{ t }}</a>
     {% endfor %}
   </div>
   {% endif %}
@@ -102,14 +171,14 @@
 
 <!-- Results count -->
 {% if emails %}
-<div class="text-muted small mb-2 ps-1">Showing {{ emails|length }} email{{ 's' if emails|length != 1 }}{% if q %} matching <strong>"{{ q }}"</strong>{% endif %}</div>
+<div class="ep-muted small mb-2 ps-1">Showing {{ emails|length }} email{{ 's' if emails|length != 1 }}{% if q %} matching <strong style="color:#0f172a;">"{{ q }}"</strong>{% endif %}</div>
 {% endif %}
 
 {% if emails %}
 <div class="card border-0 shadow-sm">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
+      <thead>
         <tr>
           <th style="width:95px">Date</th>
           <th style="width:50px"></th>
@@ -124,23 +193,23 @@
       <tbody>
         {% for e in emails %}
         <tr>
-          <td class="text-muted small text-nowrap">{{ e.sent_on }}</td>
+          <td class="small text-nowrap" style="color:#64748b;">{{ e.sent_on }}</td>
           <td>
             {% if e.direction == 'received' %}
-              <span class="badge bg-info-subtle text-info-emphasis" title="Received"><i class="bi bi-inbox"></i></span>
+              <span class="badge" style="background:rgba(10,140,170,.15);color:#0e7490;" title="Received"><i class="bi bi-inbox"></i></span>
             {% else %}
-              <span class="badge bg-primary-subtle text-primary-emphasis" title="Sent"><i class="bi bi-send"></i></span>
+              <span class="badge" style="background:rgba(201,168,76,.15);color:#92740e;" title="Sent"><i class="bi bi-send"></i></span>
             {% endif %}
           </td>
           <td>
-            <a href="{{ url_for('email_detail', email_id=e.id) }}" class="fw-semibold text-decoration-none text-dark">
+            <a href="{{ url_for('email_detail', email_id=e.id) }}" class="subject-link text-decoration-none">
               {{ e.subject or '(no subject)' }}
             </a>
             {% if e.body %}
-            <div class="text-muted small text-truncate" style="max-width:400px;">{{ e.body[:120] | replace('\n', ' ') | replace('\r', '') }}</div>
+            <div class="small text-truncate" style="max-width:400px;color:#64748b;">{{ e.body[:120] | replace('\n', ' ') | replace('\r', '') }}</div>
             {% endif %}
           </td>
-          <td class="small text-muted">
+          <td class="small" style="color:#64748b;">
             {% if e.direction == 'received' %}
               <div class="text-truncate" style="max-width:170px;" title="{{ e.from_addr }}">
                 <i class="bi bi-person me-1"></i>{{ e.from_addr or '—' }}
@@ -153,24 +222,26 @@
           </td>
           <td>
             {% if e.deal_name %}
-              <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" class="badge bg-primary text-decoration-none">{{ e.deal_name }}</a>
+              <a href="{{ url_for('deal_detail', deal_id=e.deal_id) }}" class="badge text-decoration-none"
+                 style="background:rgba(201,168,76,.2);color:#92740e;border:1px solid rgba(201,168,76,.4);">{{ e.deal_name }}</a>
             {% else %}
-              <span class="text-muted small">—</span>
+              <span style="color:#94a3b8;">—</span>
             {% endif %}
           </td>
           <td>
             {% if e.gp_name %}
-              <a href="{{ url_for('contact_detail', contact_id=e.contact_id) }}" class="badge bg-success text-decoration-none">{{ e.gp_name }}</a>
+              <a href="{{ url_for('contact_detail', contact_id=e.contact_id) }}" class="badge text-decoration-none"
+                 style="background:rgba(25,135,84,.15);color:#166534;border:1px solid rgba(25,135,84,.3);">{{ e.gp_name }}</a>
             {% else %}
-              <span class="text-muted small">—</span>
+              <span style="color:#94a3b8;">—</span>
             {% endif %}
           </td>
           <td>
             {% if e.tags %}
               {% for t in e.tags.split(',') %}
-                <span class="badge bg-light text-dark border" style="font-size:.65rem;">{{ t.strip() }}</span>
+                <span class="badge" style="background:#e2e8f0;color:#475569;font-size:.65rem;">{{ t.strip() }}</span>
               {% endfor %}
-            {% else %}—{% endif %}
+            {% else %}<span style="color:#94a3b8;">—</span>{% endif %}
           </td>
           <td>
             <a href="{{ url_for('email_detail', email_id=e.id) }}" class="btn btn-sm btn-outline-secondary py-0">Open</a>
@@ -183,16 +254,17 @@
 </div>
 
 {% elif q or deal_filter or direction_filter or date_from or date_to or tag_filter %}
-<div class="text-center py-5 text-muted">
+<div class="text-center py-5" style="color:#64748b;">
   <i class="bi bi-search fs-1 d-block mb-2"></i>
   No emails match your search.
 </div>
 
 {% elif total > 0 %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+<div class="text-center py-5" style="color:#64748b;">
+  <i class="bi bi-check-circle fs-1 d-block mb-2" style="color:#16a34a;"></i>
   All {{ total }} emails synced. Use the search bar to find anything.
 </div>
 {% endif %}
 
+</div>{# end .ep #}
 {% endblock %}
