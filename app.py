@@ -1013,13 +1013,17 @@ def sync_emails():
                                 to_addr = item.To or ""
                                 cc_addr = item.CC or ""
                                 try:
-                                    if item.SenderEmailType == "EX":
-                                        ex_user = item.Sender.GetExchangeUser()
-                                        from_addr = ex_user.PrimarySmtpAddress if ex_user else (item.SenderName or "")
-                                    else:
-                                        from_addr = item.SenderEmailAddress or item.SenderName or ""
+                                    # Use MAPI property to get SMTP address directly —
+                                    # avoids slow GetExchangeUser() Exchange round-trip
+                                    PR_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
+                                    from_addr = item.PropertyAccessor.GetProperty(PR_SMTP)
+                                    if not from_addr:
+                                        raise ValueError("empty")
                                 except Exception:
-                                    from_addr = item.SenderName or ""
+                                    try:
+                                        from_addr = item.SenderEmailAddress or item.SenderName or ""
+                                    except Exception:
+                                        from_addr = item.SenderName or ""
                                 sent_on_str = ts.strftime("%Y-%m-%d")
 
                                 contact_id = None
@@ -1072,15 +1076,18 @@ def sync_emails():
                 conn.execute(
                     "INSERT INTO emails (subject, body, from_addr, to_addr, cc_addr, sent_on, "
                     "direction, deal_id, contact_id, entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-                    "ON CONFLICT(entry_id) DO UPDATE SET from_addr=excluded.from_addr",
+                    "ON CONFLICT(entry_id) DO NOTHING",
                     row,
                 )
-                synced += 1
+                if conn.execute("SELECT changes()").fetchone()[0]:
+                    synced += 1
+                else:
+                    skipped += 1
             except Exception:
                 skipped += 1
         conn.commit()
         conn.close()
-        flash(f"Synced {synced} new emails ({skipped} already imported).", "success")
+        flash(f"Synced {synced} new emails ({skipped} already in archive).", "success")
 
     return redirect(url_for("emails"))
 
