@@ -918,44 +918,57 @@ def sync_emails():
                     pass
 
                 rows = []
+                # Use start of the cutoff day so "Today only" includes all of today
+                cutoff_day = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
+                cutoff_str = cutoff_day.strftime("%m/%d/%Y %H:%M %p")
 
                 def _collect_folder(folder, direction):
-                    for item in folder.Items:
+                    try:
+                        items = folder.Items
+                        # Ask Outlook to pre-filter by date — much faster than scanning everything
+                        date_field = "[SentOn]" if direction == "sent" else "[ReceivedTime]"
                         try:
-                            if item.Class != 43:
-                                continue
-                            sent_on = item.SentOn.replace(tzinfo=None) if hasattr(item, 'SentOn') else None
-                            received_on = item.ReceivedTime.replace(tzinfo=None) if hasattr(item, 'ReceivedTime') else None
-                            ts = sent_on or received_on
-                            if not ts or ts < cutoff:
-                                continue
-                            entry_id = item.EntryID
-                            subject = item.Subject or ""
-                            body = (item.Body or "")[:10000]
-                            to_addr = item.To or ""
-                            cc_addr = item.CC or ""
-                            from_addr = item.SenderEmailAddress or item.SenderName or ""
-                            sent_on_str = ts.strftime("%Y-%m-%d")
-
-                            contact_id = None
-                            all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
-                            for addr in all_addrs.split(";"):
-                                addr = addr.strip()
-                                if addr and addr not in own_addrs and addr in contact_email_map:
-                                    contact_id = contact_email_map[addr]
-                                    break
-
-                            deal_id = None
-                            subject_lower = subject.lower()
-                            for words, d_id in deal_keywords:
-                                if any(w in subject_lower for w in words):
-                                    deal_id = d_id
-                                    break
-
-                            rows.append((subject, body, from_addr, to_addr, cc_addr,
-                                         sent_on_str, direction, deal_id, contact_id, entry_id))
+                            items = items.Restrict(f"{date_field} >= '{cutoff_str}'")
                         except Exception:
-                            continue
+                            pass  # fallback: iterate all (slow but won't crash)
+                        for item in items:
+                            try:
+                                if item.Class != 43:
+                                    continue
+                                sent_on = item.SentOn.replace(tzinfo=None) if hasattr(item, 'SentOn') else None
+                                received_on = item.ReceivedTime.replace(tzinfo=None) if hasattr(item, 'ReceivedTime') else None
+                                ts = sent_on or received_on
+                                if not ts or ts < cutoff_day:
+                                    continue
+                                entry_id = item.EntryID
+                                subject = item.Subject or ""
+                                body = (item.Body or "")[:10000]
+                                to_addr = item.To or ""
+                                cc_addr = item.CC or ""
+                                from_addr = item.SenderEmailAddress or item.SenderName or ""
+                                sent_on_str = ts.strftime("%Y-%m-%d")
+
+                                contact_id = None
+                                all_addrs = (to_addr + ";" + cc_addr + ";" + from_addr).lower().replace(",", ";")
+                                for addr in all_addrs.split(";"):
+                                    addr = addr.strip()
+                                    if addr and addr not in own_addrs and addr in contact_email_map:
+                                        contact_id = contact_email_map[addr]
+                                        break
+
+                                deal_id = None
+                                subject_lower = subject.lower()
+                                for words, d_id in deal_keywords:
+                                    if any(w in subject_lower for w in words):
+                                        deal_id = d_id
+                                        break
+
+                                rows.append((subject, body, from_addr, to_addr, cc_addr,
+                                             sent_on_str, direction, deal_id, contact_id, entry_id))
+                            except Exception:
+                                continue
+                    except Exception:
+                        pass
 
                 _collect_folder(ns.GetDefaultFolder(5), "sent")
                 if include_inbox:
@@ -971,7 +984,9 @@ def sync_emails():
 
     t = threading.Thread(target=_sync)
     t.start()
-    t.join()
+    t.join(timeout=120)  # give up after 2 minutes
+    if t.is_alive():
+        result["error"] = "Sync timed out after 2 minutes. Make sure Outlook is open and try a shorter date range."
 
     if "error" in result:
         flash(result["error"], "danger")
