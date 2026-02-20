@@ -447,6 +447,45 @@ def delete_deal(deal_id):
     return redirect(url_for("deals"))
 
 
+@app.route("/deals/export.csv")
+def export_deals():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM deals ORDER BY created_at DESC").fetchall()
+    conn.close()
+    cols = ["id", "name", "asset_type", "location", "target_raise", "status",
+            "purchase_price", "units_sf", "noi_current", "noi_projected",
+            "cap_rate", "exit_cap_rate", "ltv", "hold_period",
+            "irr_target", "equity_multiple", "closing_date", "notes", "created_at"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([r[c] for c in cols])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=deals.csv"})
+
+
+@app.route("/deals/<int:deal_id>/outreach/export.csv")
+def export_outreach(deal_id):
+    conn = get_db()
+    deal = conn.execute("SELECT name FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    rows = conn.execute(
+        "SELECT * FROM outreach WHERE deal_id = ? ORDER BY outreach_date DESC", (deal_id,)
+    ).fetchall()
+    conn.close()
+    cols = ["id", "contact_name", "company", "email", "sent_by", "outreach_date",
+            "outreach_summary", "response_date", "response_summary",
+            "follow_up_needed", "stage", "interest_level", "created_at"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(cols)
+    for r in rows:
+        writer.writerow([r[c] for c in cols])
+    fname = f"outreach_{deal['name'].replace(' ', '_') if deal else deal_id}.csv"
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
 # ── Outreach ───────────────────────────────────────────────────────────────────
 
 @app.route("/deals/<int:deal_id>/outreach/new", methods=["GET", "POST"])
