@@ -141,10 +141,8 @@
     <div class="eml-list" id="emailList">
       {% if emails %}
         {% for e in emails %}
-        <a href="{{ url_for('email_detail', email_id=e.id) }}"
-           class="eml-row {% if loop.first %}active{% endif %}"
-           data-id="{{ e.id }}"
-           onclick="loadEmail(event, this, '{{ url_for('email_pane', email_id=e.id) }}')">
+        <a href="{{ url_for('emails', q=q, deal_id=deal_filter, direction=direction_filter, selected=e.id) }}"
+           class="eml-row {% if selected_email and selected_email['id'] == e.id %}active{% endif %}">
           <div class="eml-row-top">
             <span class="eml-row-who">
               {% if e.direction == 'received' %}{{ e.from_addr or '—' }}{% else %}To: {{ e.to_addr or '—' }}{% endif %}
@@ -193,8 +191,8 @@
 
   <!-- RIGHT: Reading Pane -->
   <div class="eml-reading-col" id="readingPane">
-    {% if emails %}
-      {% set e = emails[0] %}
+    {% if selected_email %}
+      {% set e = selected_email %}
       <div class="eml-reading-toolbar">
         <a href="{{ url_for('email_detail', email_id=e.id) }}" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-box-arrow-up-right"></i> Full Page
@@ -236,30 +234,5 @@
 
 </div>
 
-<script>
-function loadEmail(evt, row, url) {
-  evt.preventDefault();
-  document.querySelectorAll('.eml-row').forEach(r => r.classList.remove('active'));
-  row.classList.add('active');
-  const pane = document.getElementById('readingPane');
-  if (!pane) { console.error('readingPane not found'); window.location.href = row.href; return; }
-  pane.style.opacity = '0.5';
-  fetch(url)
-    .then(function(r) {
-      console.log('Pane fetch status:', r.status, url);
-      if (!r.ok) throw new Error('Server error ' + r.status);
-      return r.text();
-    })
-    .then(function(html) {
-      pane.innerHTML = html;
-      pane.style.opacity = '1';
-    })
-    .catch(function(err) {
-      console.error('loadEmail error:', err);
-      pane.style.opacity = '1';
-      pane.innerHTML = '<div style="padding:20px;color:red;">Failed to load email. <a href="' + row.href + '">Open full page</a></div>';
-    });
-}
-</script>
 
 {% endblock %}

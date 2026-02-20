@@ -967,20 +967,29 @@ def emails():
                         or (len(words) > 1 and all(w in fields for w in words)))
 
             rows = [r for r in rows if _email_matches(r)]
+    selected_id = request.args.get("selected", type=int)
     deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
     contacts = conn.execute("SELECT id, name FROM gp_contacts ORDER BY name").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
-    # All distinct tags
     raw_tags = conn.execute("SELECT tags FROM emails WHERE tags IS NOT NULL AND tags != ''").fetchall()
     all_tags = sorted(set(
         t.strip() for row in raw_tags for t in row["tags"].split(",") if t.strip()
     ))
     conn.close()
+
+    # Determine which email to show in reading pane
+    rows_list = list(rows)
+    selected_email = None
+    if selected_id:
+        selected_email = next((r for r in rows_list if r["id"] == selected_id), None)
+    if not selected_email and rows_list:
+        selected_email = rows_list[0]
+
     return render_template(
-        "emails.html", emails=rows, q=q, deals=deals, contacts=contacts,
+        "emails.html", emails=rows_list, q=q, deals=deals, contacts=contacts,
         deal_filter=deal_filter, direction_filter=direction_filter,
         date_from=date_from, date_to=date_to, tag_filter=tag_filter,
-        total=total, all_tags=all_tags,
+        total=total, all_tags=all_tags, selected_email=selected_email,
     )
 
 
