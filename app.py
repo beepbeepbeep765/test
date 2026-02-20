@@ -722,6 +722,7 @@ def emails():
     tag_filter = request.args.get("tag", "")
 
     conn = get_db()
+    # Build base SQL with non-search filters
     sql = (
         "SELECT e.*, d.name as deal_name, g.name as gp_name "
         "FROM emails e "
@@ -730,9 +731,6 @@ def emails():
         "WHERE 1=1"
     )
     params = []
-    if q:
-        sql += " AND (e.subject LIKE ? OR e.body LIKE ? OR e.to_addr LIKE ? OR e.from_addr LIKE ?)"
-        params += [f"%{q}%"] * 4
     if deal_filter:
         sql += " AND e.deal_id = ?"
         params.append(deal_filter)
@@ -751,6 +749,23 @@ def emails():
 
     sql += " ORDER BY e.sent_on DESC LIMIT 500"
     rows = conn.execute(sql, params).fetchall()
+
+    if q:
+        try:
+            from search_engine import semantic_search
+            rows = [dict(r) for r in rows]
+            results = semantic_search(
+                q, rows,
+                lambda e: " ".join(filter(None, [e.get("subject"), e.get("from_addr"), e.get("to_addr"), (e.get("body") or "")[:300]])),
+                top_k=100, threshold=0.15,
+            )
+            rows = [item for item, _score in results]
+        except Exception:
+            # Fall back to basic keyword search if semantic search unavailable
+            kw = q.lower()
+            rows = [r for r in rows if kw in (r["subject"] or "").lower()
+                    or kw in (r["from_addr"] or "").lower()
+                    or kw in (r["to_addr"] or "").lower()]
     deals = conn.execute("SELECT id, name FROM deals ORDER BY name").fetchall()
     contacts = conn.execute("SELECT id, name FROM gp_contacts ORDER BY name").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
