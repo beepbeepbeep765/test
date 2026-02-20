@@ -219,7 +219,7 @@ body::before {
 .bg-danger    { background: rgba(180,40,50,.55)  !important; }
 .bg-info      { background: rgba(10,140,170,.5)  !important; }
 .bg-secondary { background: rgba(255,255,255,.15) !important; }
-.bg-primary   { background: rgba(80,100,160,.5)  !important; }
+.bg-primary   { background: rgba(201,168,76,.4)  !important; }
 
 /* ── Alerts ───────────────────────────────────────────────────────── */
 .alert {
@@ -377,12 +377,12 @@ pre { background: transparent; }
 .dropdown-item:hover { background: rgba(255,255,255,.07); color: #fff; }
 
 /* ── Bootstrap subtle/emphasis overrides (dark-theme fix) ─────────── */
-.bg-primary-subtle   { background: rgba(80,100,200,.22)  !important; }
+.bg-primary-subtle   { background: rgba(255,255,255,.08)  !important; }
 .bg-info-subtle      { background: rgba(10,140,170,.2)   !important; }
 .bg-success-subtle   { background: rgba(25,135,84,.2)    !important; }
 .bg-danger-subtle    { background: rgba(220,53,69,.2)    !important; }
 .bg-warning-subtle   { background: rgba(201,168,76,.18)  !important; }
-.text-primary-emphasis   { color: #93b4ff !important; }
+.text-primary-emphasis   { color: var(--acre-silver) !important; }
 .text-info-emphasis      { color: #67e8f9 !important; }
 .text-success-emphasis   { color: #4ade80 !important; }
 .text-danger-emphasis    { color: #f87171 !important; }
