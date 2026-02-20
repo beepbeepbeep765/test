@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Search — ACRE CRM{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+  <h4 class="fw-bold text-white mb-1">
+    <i class="bi bi-search me-2" style="color:var(--acre-gold)"></i>
+    {% if q %}Results for "{{ q }}"{% else %}Smart Search{% endif %}
+  </h4>
+  <small class="text-muted">Searches across GP contacts, deals, and emails — locally, nothing leaves your machine.</small>
+</div>
+
+<!-- Search bar -->
+<form method="GET" action="{{ url_for('search') }}" class="mb-4">
+  <div class="input-group" style="max-width:560px;">
+    <input type="text" name="q" class="form-control form-control-lg"
+           value="{{ q }}" placeholder="e.g. value-add multifamily Texas…" autofocus />
+    <button type="submit" class="btn btn-warning px-4 fw-semibold">
+      <i class="bi bi-search me-1"></i>Search
+    </button>
+  </div>
+</form>
+
+{% if error %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+</div>
+{% endif %}
+
+{% if q and not error %}
+
+  {% set total = contacts|length + deals|length + emails|length %}
+  {% if total == 0 %}
+  <div class="card border-0 shadow-sm text-center py-5">
+    <div class="card-body">
+      <i class="bi bi-search fs-1 d-block mb-3 text-muted"></i>
+      <p class="text-muted mb-0">No results found for <strong class="text-white">"{{ q }}"</strong>. Try different words or a broader description.</p>
+    </div>
+  </div>
+  {% else %}
+
+  <p class="text-muted small mb-4">Found {{ total }} result{{ 's' if total != 1 }} across all sections.</p>
+
+  <!-- GP Contacts -->
+  {% if contacts %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center gap-2 py-2">
+      <i class="bi bi-people" style="color:var(--acre-gold)"></i>
+      <span class="fw-semibold">GP Contacts</span>
+      <span class="badge bg-secondary ms-auto">{{ contacts|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Name</th><th>Company</th><th>Strategy</th><th>Status</th><th>Match</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for contact, score in contacts %}
+          <tr>
+            <td><a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="fw-semibold text-white text-decoration-none">{{ contact.name }}</a></td>
+            <td class="text-muted">{{ contact.company or '—' }}</td>
+            <td class="text-muted">{{ contact.strategy or '—' }}</td>
+            <td>
+              {% if contact.status %}
+              <span class="badge bg-secondary">{{ contact.status }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div style="height:4px;width:60px;background:rgba(255,255,255,.1);border-radius:2px;">
+                  <div style="height:4px;width:{{ (score*100)|int }}%;background:var(--acre-gold);border-radius:2px;"></div>
+                </div>
+                <small class="text-muted">{{ (score*100)|int }}%</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Deals -->
+  {% if deals %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center gap-2 py-2">
+      <i class="bi bi-building" style="color:var(--acre-gold)"></i>
+      <span class="fw-semibold">Deals</span>
+      <span class="badge bg-secondary ms-auto">{{ deals|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Deal</th><th>Type</th><th>Location</th><th>Status</th><th>Match</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for deal, score in deals %}
+          <tr>
+            <td><a href="{{ url_for('deal_detail', deal_id=deal.id) }}" class="fw-semibold text-white text-decoration-none">{{ deal.name }}</a></td>
+            <td class="text-muted">{{ deal.asset_type or '—' }}</td>
+            <td class="text-muted">{{ deal.location or '—' }}</td>
+            <td>
+              {% if deal.status %}
+              <span class="badge bg-secondary">{{ deal.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div style="height:4px;width:60px;background:rgba(255,255,255,.1);border-radius:2px;">
+                  <div style="height:4px;width:{{ (score*100)|int }}%;background:var(--acre-gold);border-radius:2px;"></div>
+                </div>
+                <small class="text-muted">{{ (score*100)|int }}%</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Emails -->
+  {% if emails %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header d-flex align-items-center gap-2 py-2">
+      <i class="bi bi-envelope" style="color:var(--acre-gold)"></i>
+      <span class="fw-semibold">Emails</span>
+      <span class="badge bg-secondary ms-auto">{{ emails|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Subject</th><th>From</th><th>Date</th><th>Match</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for email, score in emails %}
+          <tr>
+            <td><a href="{{ url_for('email_detail', email_id=email.id) }}" class="text-white text-decoration-none">{{ email.subject or '(no subject)' }}</a></td>
+            <td class="text-muted small">{{ email.from_addr or '—' }}</td>
+            <td class="text-muted small">{{ email.sent_on or '—' }}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div style="height:4px;width:60px;background:rgba(255,255,255,.1);border-radius:2px;">
+                  <div style="height:4px;width:{{ (score*100)|int }}%;background:var(--acre-gold);border-radius:2px;"></div>
+                </div>
+                <small class="text-muted">{{ (score*100)|int }}%</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+{% endif %}
+
+{% endblock %}

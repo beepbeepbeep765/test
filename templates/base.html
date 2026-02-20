@@ -23,6 +23,16 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
+      <form method="GET" action="{{ url_for('search') }}" class="d-flex mx-3 flex-grow-1" style="max-width:340px;">
+        <div class="input-group input-group-sm">
+          <input type="text" name="q" class="form-control" placeholder="Smart search…"
+                 value="{{ request.args.get('q','') if request.endpoint == 'search' else '' }}"
+                 style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12);color:#fff;" />
+          <button type="submit" class="btn btn-sm" style="background:var(--acre-gold);color:#0a0f1a;border:none;padding:0 10px;">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </form>
       <ul class="navbar-nav ms-auto gap-1">
         <li class="nav-item">
           <a class="nav-link rounded px-3 {% if request.endpoint == 'index' %}active bg-white bg-opacity-10{% endif %}" href="{{ url_for('index') }}">

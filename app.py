@@ -996,6 +996,69 @@ def dismiss_reminder(kind, rid):
     return redirect(request.referrer or url_for("reminders"))
 
 
+# ── Smart Search ───────────────────────────────────────────────────────────────
+
+@app.route("/search")
+def search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return render_template("search_results.html", q="", contacts=[], deals=[], emails=[], error=None)
+
+    conn = get_db()
+    contact_results = deal_results = email_results = []
+    error = None
+
+    try:
+        from search_engine import semantic_search
+
+        all_contacts = [dict(r) for r in conn.execute("SELECT * FROM gp_contacts").fetchall()]
+        contact_results = semantic_search(
+            q, all_contacts,
+            lambda c: " ".join(filter(None, [
+                c.get("name"), c.get("company"), c.get("title"),
+                c.get("strategy"), c.get("location"), c.get("notes"),
+                c.get("aum_range"), c.get("source"),
+            ])),
+            top_k=6,
+        )
+
+        all_deals = [dict(r) for r in conn.execute("SELECT * FROM deals").fetchall()]
+        deal_results = semantic_search(
+            q, all_deals,
+            lambda d: " ".join(filter(None, [
+                d.get("name"), d.get("asset_type"), d.get("location"),
+                d.get("status"), d.get("notes"),
+            ])),
+            top_k=6,
+        )
+
+        all_emails = [dict(r) for r in conn.execute(
+            "SELECT * FROM emails ORDER BY sent_on DESC LIMIT 500"
+        ).fetchall()]
+        email_results = semantic_search(
+            q, all_emails,
+            lambda e: " ".join(filter(None, [
+                e.get("subject"), e.get("from_addr"), e.get("to_addr"),
+            ])),
+            top_k=6,
+        )
+
+    except ImportError:
+        error = "Smart search not installed yet. Run: pip install sentence-transformers numpy"
+    except Exception as ex:
+        error = f"Search error: {ex}"
+
+    conn.close()
+    return render_template(
+        "search_results.html",
+        q=q,
+        contacts=contact_results,
+        deals=deal_results,
+        emails=email_results,
+        error=error,
+    )
+
+
 with app.app_context():
     init_db()
 
