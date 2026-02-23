@@ -184,6 +184,34 @@ def init_db():
             last_contacted TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body_template TEXT NOT NULL,
+            status TEXT DEFAULT 'draft',
+            total_count INTEGER DEFAULT 0,
+            sent_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            sent_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS campaign_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL,
+            contact_id INTEGER,
+            to_name TEXT,
+            to_email TEXT,
+            company TEXT,
+            subject TEXT,
+            body TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now')),
+            sent_at TEXT,
+            FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
+            FOREIGN KEY (contact_id) REFERENCES gp_contacts(id)
+        );
     """)
 
     # Safe migrations for existing databases
@@ -1580,6 +1608,365 @@ def export_lenders():
         writer.writerow([r[c] for c in cols])
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=lenders.csv"})
+
+
+# ── Email Campaigns ────────────────────────────────────────────────────────────
+
+def _apply_merge(text, contact):
+    """Replace {merge_fields} in text with contact data."""
+    if not text:
+        return text
+    name = contact["name"] or ""
+    first_name = name.split()[0] if name else ""
+    company = contact["company"] or "your firm"
+    strategy = contact["strategy"] or ""
+    location = contact["location"] or ""
+    aum = contact["aum_range"] or ""
+    return (text
+            .replace("{first_name}", first_name)
+            .replace("{full_name}", name)
+            .replace("{company}", company)
+            .replace("{strategy}", strategy)
+            .replace("{location}", location)
+            .replace("{aum}", aum))
+
+
+@app.route("/campaigns")
+def campaigns():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT c.*, "
+        "(SELECT COUNT(*) FROM campaign_emails WHERE campaign_id=c.id) as total_count, "
+        "(SELECT COUNT(*) FROM campaign_emails WHERE campaign_id=c.id AND status='sent') as sent_count "
+        "FROM campaigns c ORDER BY c.created_at DESC"
+    ).fetchall()
+    conn.close()
+    return render_template("campaigns.html", campaigns=rows)
+
+
+@app.route("/campaigns/new", methods=["GET", "POST"])
+def new_campaign():
+    conn = get_db()
+    templates_list = conn.execute("SELECT * FROM email_templates ORDER BY name").fetchall()
+
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        subject = request.form["subject"].strip()
+        body = request.form["body"].strip()
+
+        # Filter GPs
+        sql = "SELECT * FROM gp_contacts WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+        params = []
+        status_filter = request.form.getlist("status_filter")
+        strategy_kw = request.form.get("strategy_kw", "").strip()
+        if status_filter:
+            placeholders = ",".join("?" * len(status_filter))
+            sql += f" AND status IN ({placeholders})"
+            params += status_filter
+        if strategy_kw:
+            sql += " AND strategy LIKE ?"
+            params.append(f"%{strategy_kw}%")
+        sql += " ORDER BY name"
+
+        gps = conn.execute(sql, params).fetchall()
+
+        if not gps:
+            conn.close()
+            flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
+            return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+
+        # Save campaign
+        cur = conn.execute(
+            "INSERT INTO campaigns (name, subject, body_template) VALUES (?, ?, ?)",
+            (name, subject, body),
+        )
+        campaign_id = cur.lastrowid
+
+        # Generate draft emails
+        for gp in gps:
+            rendered_subject = _apply_merge(subject, gp)
+            rendered_body = _apply_merge(body, gp)
+            conn.execute(
+                "INSERT INTO campaign_emails (campaign_id, contact_id, to_name, to_email, company, subject, body) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (campaign_id, gp["id"], gp["name"], gp["email"], gp["company"],
+                 rendered_subject, rendered_body),
+            )
+
+        conn.commit()
+        conn.close()
+        flash(f"Generated {len(gps)} draft emails. Review them below then send.", "success")
+        return redirect(url_for("campaign_review", campaign_id=campaign_id))
+
+    conn.close()
+    return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+
+
+@app.route("/campaigns/<int:campaign_id>/review")
+def campaign_review(campaign_id):
+    conn = get_db()
+    campaign = conn.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    if not campaign:
+        conn.close(); flash("Campaign not found.", "danger"); return redirect(url_for("campaigns"))
+    emails_list = conn.execute(
+        "SELECT ce.*, g.strategy, g.aum_range "
+        "FROM campaign_emails ce "
+        "LEFT JOIN gp_contacts g ON ce.contact_id = g.id "
+        "WHERE ce.campaign_id = ? ORDER BY ce.to_name",
+        (campaign_id,),
+    ).fetchall()
+    conn.close()
+    pending = [e for e in emails_list if e["status"] == "pending"]
+    sent = [e for e in emails_list if e["status"] == "sent"]
+    return render_template("campaign_review.html", campaign=campaign,
+                           emails=emails_list, pending=pending, sent=sent)
+
+
+@app.route("/campaigns/<int:campaign_id>/send", methods=["POST"])
+def campaign_send(campaign_id):
+    conn = get_db()
+    campaign = conn.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    if not campaign:
+        conn.close(); flash("Campaign not found.", "danger"); return redirect(url_for("campaigns"))
+
+    selected_ids = request.form.getlist("email_ids")
+    if not selected_ids:
+        conn.close(); flash("No emails selected.", "warning")
+        return redirect(url_for("campaign_review", campaign_id=campaign_id))
+
+    selected_ids = [int(i) for i in selected_ids]
+    rows = conn.execute(
+        f"SELECT * FROM campaign_emails WHERE campaign_id = ? AND id IN ({','.join('?'*len(selected_ids))})",
+        [campaign_id] + selected_ids,
+    ).fetchall()
+
+    import threading
+    result = {"sent": 0, "failed": 0, "error": None}
+
+    def _send_all(rows=rows):
+        try:
+            import pythoncom
+            import win32com.client
+            pythoncom.CoInitialize()
+            try:
+                outlook = win32com.client.Dispatch("Outlook.Application")
+                for row in rows:
+                    try:
+                        mail = outlook.CreateItem(0)
+                        mail.To = row["to_email"]
+                        mail.Subject = row["subject"]
+                        mail.Body = row["body"]
+                        mail.Send()
+                        result["sent"] += 1
+                        result[f"ok_{row['id']}"] = True
+                    except Exception as e:
+                        result["failed"] += 1
+                        result[f"err_{row['id']}"] = str(e)
+            finally:
+                pythoncom.CoUninitialize()
+        except ImportError:
+            result["error"] = "pywin32 not installed. Run: pip install pywin32"
+        except Exception as e:
+            result["error"] = f"Could not connect to Outlook: {e}"
+
+    t = threading.Thread(target=_send_all)
+    t.start()
+    t.join(timeout=300)
+
+    if result["error"]:
+        conn.close()
+        flash(result["error"], "danger")
+        return redirect(url_for("campaign_review", campaign_id=campaign_id))
+
+    today = date.today().isoformat()
+    for row in rows:
+        if result.get(f"ok_{row['id']}"):
+            conn.execute(
+                "UPDATE campaign_emails SET status='sent', sent_at=? WHERE id=?",
+                (datetime.now().strftime("%Y-%m-%d %H:%M"), row["id"]),
+            )
+            # Update GP last_contacted
+            if row["contact_id"]:
+                conn.execute(
+                    "UPDATE gp_contacts SET last_contacted=? WHERE id=?",
+                    (today, row["contact_id"]),
+                )
+                conn.execute(
+                    "INSERT INTO contact_notes (contact_id, note_date, note_text) VALUES (?, ?, ?)",
+                    (row["contact_id"], today,
+                     f"[Campaign: {campaign['name']}] Email sent — Subject: {row['subject']}"),
+                )
+
+    # Mark campaign as sent if all emails done
+    pending_left = conn.execute(
+        "SELECT COUNT(*) FROM campaign_emails WHERE campaign_id=? AND status='pending'",
+        (campaign_id,),
+    ).fetchone()[0]
+    if pending_left == 0:
+        conn.execute(
+            "UPDATE campaigns SET status='sent', sent_at=? WHERE id=?",
+            (datetime.now().strftime("%Y-%m-%d %H:%M"), campaign_id),
+        )
+
+    conn.commit()
+    conn.close()
+
+    if result["failed"]:
+        flash(f"Sent {result['sent']} emails. {result['failed']} failed — check the review page.", "warning")
+    else:
+        flash(f"Sent {result['sent']} emails successfully.", "success")
+
+    return redirect(url_for("campaign_review", campaign_id=campaign_id))
+
+
+@app.route("/campaigns/<int:campaign_id>/delete", methods=["POST"])
+def delete_campaign(campaign_id):
+    conn = get_db()
+    conn.execute("DELETE FROM campaign_emails WHERE campaign_id = ?", (campaign_id,))
+    conn.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+    conn.commit(); conn.close()
+    flash("Campaign deleted.", "info")
+    return redirect(url_for("campaigns"))
+
+
+# ── Preqin / Excel Import ───────────────────────────────────────────────────────
+
+# Known Preqin column name variations → our field names
+_PREQIN_COL_MAP = {
+    "name":         ["contact name", "name", "full name", "contact", "first name"],
+    "company":      ["fund manager", "manager name", "firm", "company", "organization", "employer",
+                     "fund manager name", "manager"],
+    "title":        ["job title", "title", "position", "role"],
+    "email":        ["email address", "email", "e-mail", "primary email"],
+    "phone":        ["phone", "phone number", "telephone", "mobile"],
+    "location":     ["city", "location", "country", "hq location", "office location", "geography"],
+    "aum_range":    ["aum", "total aum", "aum (usd mn)", "assets under management", "aum range",
+                     "firm aum", "fund size"],
+    "strategy":     ["strategy", "investment strategy", "fund strategy", "asset class", "focus",
+                     "primary strategy"],
+    "min_check":    ["min check", "minimum check", "min equity", "minimum investment"],
+    "max_check":    ["max check", "maximum check", "max equity", "maximum investment"],
+    "notes":        ["notes", "comments", "description"],
+}
+
+
+def _detect_col(headers, candidates):
+    """Return the first header that matches any candidate (case-insensitive)."""
+    lower_headers = [h.lower().strip() for h in headers]
+    for c in candidates:
+        if c in lower_headers:
+            return headers[lower_headers.index(c)]
+    return None
+
+
+@app.route("/contacts/import", methods=["GET", "POST"])
+def import_contacts():
+    if request.method == "GET":
+        return render_template("contacts_import.html")
+
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename:
+        flash("Please select a file to upload.", "warning")
+        return render_template("contacts_import.html")
+
+    fname = uploaded.filename.lower()
+    rows = []
+    headers = []
+
+    try:
+        if fname.endswith(".csv"):
+            import io as _io
+            content = uploaded.read().decode("utf-8-sig", errors="replace")
+            reader = csv.DictReader(_io.StringIO(content))
+            headers = reader.fieldnames or []
+            rows = list(reader)
+        elif fname.endswith((".xlsx", ".xls")):
+            import openpyxl
+            wb = openpyxl.load_workbook(uploaded, read_only=True, data_only=True)
+            ws = wb.active
+            all_rows = list(ws.iter_rows(values_only=True))
+            if not all_rows:
+                flash("The uploaded file appears to be empty.", "warning")
+                return render_template("contacts_import.html")
+            headers = [str(h).strip() if h is not None else "" for h in all_rows[0]]
+            for r in all_rows[1:]:
+                rows.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in r])))
+        else:
+            flash("Please upload a .csv or .xlsx file.", "warning")
+            return render_template("contacts_import.html")
+    except Exception as e:
+        flash(f"Could not read file: {e}", "danger")
+        return render_template("contacts_import.html")
+
+    # Build column mapping
+    col_map = {field: _detect_col(headers, candidates) for field, candidates in _PREQIN_COL_MAP.items()}
+
+    # Parse rows into contacts
+    preview = []
+    for r in rows:
+        def g(field):
+            col = col_map.get(field)
+            return (r.get(col) or "").strip() if col else ""
+
+        entry = {
+            "name": g("name"), "company": g("company"), "title": g("title"),
+            "email": g("email"), "phone": g("phone"), "location": g("location"),
+            "aum_range": g("aum_range"), "strategy": g("strategy"),
+            "min_check": g("min_check"), "max_check": g("max_check"), "notes": g("notes"),
+        }
+        if entry["name"] or entry["company"] or entry["email"]:
+            preview.append(entry)
+
+    if not preview:
+        flash("No usable rows found. Make sure the file has contact name, company, or email columns.", "warning")
+        return render_template("contacts_import.html")
+
+    return render_template("contacts_import.html", preview=preview, col_map=col_map, row_count=len(preview))
+
+
+@app.route("/contacts/import/confirm", methods=["POST"])
+def import_contacts_confirm():
+    """Receives the confirmed hidden-field rows and does the actual DB insert."""
+    i = 0
+    entries = []
+    while request.form.get(f"rows[{i}][name]") is not None or request.form.get(f"rows[{i}][email]") is not None:
+        entries.append({
+            "name":      request.form.get(f"rows[{i}][name]", "").strip(),
+            "company":   request.form.get(f"rows[{i}][company]", "").strip(),
+            "title":     request.form.get(f"rows[{i}][title]", "").strip(),
+            "email":     request.form.get(f"rows[{i}][email]", "").strip(),
+            "phone":     request.form.get(f"rows[{i}][phone]", "").strip(),
+            "location":  request.form.get(f"rows[{i}][location]", "").strip(),
+            "aum_range": request.form.get(f"rows[{i}][aum_range]", "").strip(),
+            "strategy":  request.form.get(f"rows[{i}][strategy]", "").strip(),
+            "min_check": request.form.get(f"rows[{i}][min_check]", "").strip(),
+            "max_check": request.form.get(f"rows[{i}][max_check]", "").strip(),
+            "notes":     request.form.get(f"rows[{i}][notes]", "").strip(),
+        })
+        i += 1
+
+    if not entries:
+        flash("No data received. Please re-upload your file.", "warning")
+        return redirect(url_for("import_contacts"))
+
+    conn = get_db()
+    imported = 0
+    for entry in entries:
+        if not entry["name"] and not entry["email"]:
+            continue
+        name = entry["name"] or entry["company"] or "Unknown"
+        conn.execute(
+            "INSERT INTO gp_contacts (name, title, company, email, phone, location, "
+            "aum_range, strategy, min_check, max_check, source, status, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Preqin', 'New', ?)",
+            (name, entry["title"], entry["company"], entry["email"], entry["phone"],
+             entry["location"], entry["aum_range"], entry["strategy"],
+             entry["min_check"], entry["max_check"], entry["notes"]),
+        )
+        imported += 1
+    conn.commit(); conn.close()
+    flash(f"Imported {imported} GP contacts from Preqin.", "success")
+    return redirect(url_for("contacts"))
 
 
 # ── GP Contacts CSV Export ─────────────────────────────────────────────────────

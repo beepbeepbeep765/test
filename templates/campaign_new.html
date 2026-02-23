@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}New Campaign — ACRE CRM{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="bi bi-plus-circle me-2" style="color:var(--acre-gold)"></i>New Campaign</h4>
+    <p class="text-muted small mb-0">Filter your GP contacts, write your email, and generate drafts to review before sending.</p>
+  </div>
+  <a href="{{ url_for('campaigns') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<form method="POST">
+  <div class="row g-4">
+
+    <!-- Left column: settings -->
+    <div class="col-lg-4">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">Campaign Settings</span>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Campaign Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required
+                   placeholder="e.g. Feb 2026 GP Blast" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">GP Filter</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted mb-3">
+            Only GPs with an email address will be included. Narrow by status or strategy below.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Status</label>
+            <div class="d-flex flex-wrap gap-2">
+              {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Hot Lead'] %}
+              <div class="form-check form-check-inline m-0">
+                <input class="form-check-input" type="checkbox" name="status_filter"
+                       value="{{ s }}" id="st_{{ loop.index }}" checked />
+                <label class="form-check-label small" for="st_{{ loop.index }}">{{ s }}</label>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="form-text">Uncheck any statuses you want to exclude.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold small">Strategy keyword (optional)</label>
+            <input type="text" name="strategy_kw" class="form-control form-control-sm"
+                   placeholder="e.g. multifamily, value-add" />
+            <div class="form-text">Leave blank to include all strategies.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">Load from Template</span>
+        </div>
+        <div class="card-body">
+          <select class="form-select form-select-sm" id="templatePicker">
+            <option value="">— Pick a saved template —</option>
+            {% for t in templates %}
+            <option value="{{ t.id }}"
+                    data-subject="{{ t.subject | e }}"
+                    data-body="{{ t.body | e }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text mt-1">Loads the subject + body into the editor. You can edit before generating.</div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm bg-light">
+        <div class="card-body py-3">
+          <p class="small text-muted mb-2"><strong>Available merge fields:</strong></p>
+          <div class="d-flex flex-wrap gap-1">
+            {% for f in ['{first_name}', '{full_name}', '{company}', '{strategy}', '{location}', '{aum}'] %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    style="font-size:.75rem;"
+                    onclick="insertMerge(this, '{{ f }}')">{{ f }}</button>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-2">Click to insert at cursor in the body field.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right column: email editor -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">Email</span>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Subject <span class="text-danger">*</span></label>
+            <input type="text" name="subject" id="subjectField" class="form-control" required
+                   placeholder="e.g. Introduction: ACRE Solutions" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Body <span class="text-danger">*</span></label>
+            <textarea name="body" id="bodyField" class="form-control font-monospace"
+                      rows="18" required
+                      placeholder="Hi {first_name},&#10;&#10;I hope you're doing well..."></textarea>
+            <div class="form-text">
+              Use <code>{first_name}</code>, <code>{company}</code> etc. as merge fields — they'll be personalized per GP.
+            </div>
+          </div>
+        </div>
+        <div class="card-footer bg-transparent border-0 pt-0 pb-3 d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary fw-semibold px-5">
+            <i class="bi bi-magic me-2"></i>Generate Drafts &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</form>
+
+<script>
+// Load template into subject + body fields
+document.getElementById('templatePicker').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (!opt.value) return;
+  document.getElementById('subjectField').value = opt.dataset.subject || '';
+  document.getElementById('bodyField').value = opt.dataset.body || '';
+});
+
+// Insert merge field at cursor position in body textarea
+function insertMerge(btn, field) {
+  const ta = document.getElementById('bodyField');
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const val = ta.value;
+  ta.value = val.substring(0, start) + field + val.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + field.length;
+  ta.focus();
+}
+</script>
+{% endblock %}

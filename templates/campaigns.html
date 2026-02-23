@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Campaigns — ACRE CRM{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="bi bi-send me-2" style="color:var(--acre-gold)"></i>Email Campaigns</h4>
+    <p class="text-muted small mb-0">Bulk GP outreach — review every email before it goes out.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('import_contacts') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-cloud-upload me-1"></i>Import Preqin
+    </a>
+    <a href="{{ url_for('new_campaign') }}" class="btn btn-primary btn-sm fw-semibold">
+      <i class="bi bi-plus-lg me-1"></i>New Campaign
+    </a>
+  </div>
+</div>
+
+{% if campaigns %}
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Campaign</th>
+          <th>Subject</th>
+          <th class="text-center">Total</th>
+          <th class="text-center">Sent</th>
+          <th class="text-center">Pending</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+        {% set pending = c.total_count - c.sent_count %}
+        <tr>
+          <td class="fw-semibold">
+            <a href="{{ url_for('campaign_review', campaign_id=c.id) }}" class="text-decoration-none text-dark">
+              {{ c.name }}
+            </a>
+          </td>
+          <td class="text-muted small">{{ c.subject[:60] }}{% if c.subject|length > 60 %}…{% endif %}</td>
+          <td class="text-center">{{ c.total_count }}</td>
+          <td class="text-center">
+            {% if c.sent_count > 0 %}
+            <span class="badge bg-success">{{ c.sent_count }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            {% if pending > 0 %}
+            <span class="badge bg-warning text-dark">{{ pending }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if c.status == 'sent' %}
+            <span class="badge bg-success">Sent</span>
+            {% elif c.sent_count > 0 %}
+            <span class="badge bg-warning text-dark">Partial</span>
+            {% else %}
+            <span class="badge bg-secondary">Draft</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ c.created_at[:10] if c.created_at else '' }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('campaign_review', campaign_id=c.id) }}" class="btn btn-sm btn-outline-primary me-1">
+              {% if pending > 0 %}<i class="bi bi-eye me-1"></i>Review{% else %}<i class="bi bi-eye me-1"></i>View{% endif %}
+            </a>
+            <form method="POST" action="{{ url_for('delete_campaign', campaign_id=c.id) }}" class="d-inline"
+                  onsubmit="return confirm('Delete this campaign and all its drafts?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-send fs-1 text-muted opacity-50 d-block mb-3"></i>
+    <h5 class="fw-semibold text-muted">No campaigns yet</h5>
+    <p class="text-muted mb-4">Create a campaign to draft and send personalized emails to your GP contacts in bulk.</p>
+    <a href="{{ url_for('new_campaign') }}" class="btn btn-primary fw-semibold">
+      <i class="bi bi-plus-lg me-1"></i>New Campaign
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
