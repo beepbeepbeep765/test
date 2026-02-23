@@ -3,10 +3,38 @@ import io
 import os
 import sqlite3
 from datetime import datetime, date, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, session
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
+
+CRM_PASSWORD = os.environ.get("CRM_PASSWORD", "acre2026")
+
+
+@app.before_request
+def require_login():
+    if request.endpoint in ("login", "logout", "static"):
+        return
+    if not session.get("logged_in"):
+        return redirect(url_for("login", next=request.path))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if request.form.get("password") == CRM_PASSWORD:
+            session["logged_in"] = True
+            session.permanent = True
+            next_url = request.form.get("next") or url_for("index")
+            return redirect(next_url)
+        flash("Wrong password.", "danger")
+    return render_template("login.html", next=request.args.get("next", ""))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.template_filter("fmtdatetime")
