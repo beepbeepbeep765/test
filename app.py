@@ -1925,8 +1925,8 @@ def delete_campaign(campaign_id):
 # Known Preqin column name variations → our field names
 _PREQIN_COL_MAP = {
     "name":         ["contact name", "name", "full name", "contact", "first name"],
-    "company":      ["fund manager", "manager name", "firm", "company", "organization", "employer",
-                     "fund manager name", "manager"],
+    "company":      ["fund manager", "manager name", "firm", "company", "company name",
+                     "organization", "employer", "fund manager name", "manager", "firm name"],
     "title":        ["job title", "title", "position", "role"],
     "email":        ["email address", "email", "e-mail", "primary email"],
     "phone":        ["phone", "phone number", "telephone", "mobile"],
@@ -2064,7 +2064,8 @@ def import_contacts_confirm():
 
 _LP_COL_MAP = {
     "name":                  ["contact name", "name", "full name", "investor name", "first name"],
-    "company":               ["firm", "company", "organization", "fund manager", "employer"],
+    "company":               ["firm", "company", "company name", "organization", "fund manager",
+                              "employer", "firm name", "investor firm", "lp firm"],
     "title":                 ["title", "job title", "position", "role"],
     "email":                 ["email", "email address", "e-mail", "primary email"],
     "phone":                 ["phone", "phone number", "telephone", "mobile"],
