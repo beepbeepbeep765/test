@@ -1908,7 +1908,7 @@ def campaign_send(campaign_id):
                         mail = outlook.CreateItem(0)
                         mail.To = row["to_email"]
                         mail.Subject = row["subject"]
-                        mail.Body = row["body"]
+                        mail.HTMLBody = row["body"]
                         mail.Send()
                         result["sent"] += 1
                         result[f"ok_{row['id']}"] = True

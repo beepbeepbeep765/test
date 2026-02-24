@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% block title %}New Campaign — ACRE CRM{% endblock %}
+{% block extra_head %}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+<style>
+  #quillEditor { min-height: 380px; font-size: 1rem; background: #fff; }
+  .ql-toolbar.ql-snow { border-radius: 6px 6px 0 0; border-color: #ced4da; }
+  .ql-container.ql-snow { border-radius: 0 0 6px 6px; border-color: #ced4da; }
+  .ql-picker.ql-font .ql-picker-label::before,
+  .ql-picker.ql-font .ql-picker-item::before { content: attr(data-value) !important; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
@@ -11,7 +21,7 @@
   </a>
 </div>
 
-<form method="POST">
+<form method="POST" id="campaignForm">
   <input type="hidden" name="target_audience" id="targetAudience" value="gp" />
 
   <div class="row g-4">
@@ -266,10 +276,10 @@
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold small">Body <span class="text-danger">*</span></label>
-            <textarea name="body" id="bodyField" class="form-control font-monospace"
-                      rows="18" required
-                      placeholder="Hi {first_name},&#10;&#10;I hope you're doing well..."></textarea>
-            <div class="form-text">
+            <!-- Hidden input that gets populated with Quill HTML before submit -->
+            <input type="hidden" name="body" id="bodyField" />
+            <div id="quillEditor"></div>
+            <div class="form-text mt-1">
               Use merge fields on the left — they'll be personalized per recipient.
             </div>
           </div>
@@ -368,18 +378,20 @@ document.getElementById('templatePicker').addEventListener('change', function() 
   const opt = this.options[this.selectedIndex];
   if (!opt.value) return;
   document.getElementById('subjectField').value = opt.dataset.subject || '';
-  document.getElementById('bodyField').value = opt.dataset.body || '';
+  const bodyHtml = opt.dataset.body || '';
+  // If it looks like HTML, paste it; otherwise treat as plain text
+  if (bodyHtml.trim().startsWith('<')) {
+    quill.clipboard.dangerouslyPasteHTML(bodyHtml);
+  } else {
+    quill.setText(bodyHtml);
+  }
 });
 
-// Insert merge field at cursor position in body textarea
+// Insert merge field at Quill cursor position
 function insertMerge(btn, field) {
-  const ta = document.getElementById('bodyField');
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  const val = ta.value;
-  ta.value = val.substring(0, start) + field + val.substring(end);
-  ta.selectionStart = ta.selectionEnd = start + field.length;
-  ta.focus();
+  quill.focus();
+  const range = quill.getSelection(true);
+  quill.insertText(range ? range.index : quill.getLength(), field);
 }
 
 // Init: disable LP checkboxes on load (GP is default)
@@ -506,5 +518,41 @@ function clearLPPicks() {
   document.getElementById('lpContactList').innerHTML =
     '<p class="text-muted small mb-0 p-2">Type above to search LP investors.</p>';
 }
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+var Font = Quill.import('formats/font');
+Font.whitelist = ['sans-serif', 'serif', 'monospace', 'arial', 'georgia', 'verdana'];
+Quill.register(Font, true);
+
+var quill = new Quill('#quillEditor', {
+  theme: 'snow',
+  placeholder: "Hi {first_name},\n\nI hope you're doing well...",
+  modules: {
+    toolbar: [
+      [{ 'font': Font.whitelist }],
+      [{ 'size': ['small', false, 'large', 'huge'] }],
+      ['bold', 'italic', 'underline'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'align': [] }],
+      [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+      ['clean']
+    ]
+  }
+});
+
+document.getElementById('campaignForm').addEventListener('submit', function(e) {
+  var html = quill.root.innerHTML;
+  if (!html || html === '<p><br></p>') {
+    e.preventDefault();
+    quill.root.style.border = '2px solid red';
+    quill.focus();
+    return;
+  }
+  document.getElementById('bodyField').value = html;
+});
 </script>
 {% endblock %}
