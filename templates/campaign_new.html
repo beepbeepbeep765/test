@@ -45,6 +45,32 @@
         </div>
       </div>
 
+      <!-- GP Import Batches -->
+      <div id="gpBatches" class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">Select by Import</span>
+        </div>
+        <div class="card-body">
+          {% if gp_batches %}
+          <p class="small text-muted mb-2">Click a batch to target only those contacts. Click again to deselect.</p>
+          <div class="d-flex flex-wrap gap-2" id="gpBatchChips">
+            {% for b in gp_batches %}
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary batch-chip"
+                    data-batch-id="{{ b.id }}"
+                    data-audience="gp"
+                    onclick="toggleBatch(this)">
+              <i class="bi bi-collection me-1"></i>{{ b.label }}
+              <span class="badge bg-secondary ms-1" style="font-size:.65rem;">{{ b.count }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="small text-muted mb-0">No GP imports yet. Upload a Preqin file to create a batch.</p>
+          {% endif %}
+        </div>
+      </div>
+
       <!-- GP Filter -->
       <div id="gpFilter" class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-transparent border-0 pb-0 pt-3">
@@ -73,6 +99,32 @@
                    placeholder="e.g. multifamily, value-add" />
             <div class="form-text">Leave blank to include all strategies.</div>
           </div>
+        </div>
+      </div>
+
+      <!-- LP Import Batches -->
+      <div id="lpBatches" class="card border-0 shadow-sm mb-4" style="display:none;">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">Select by Import</span>
+        </div>
+        <div class="card-body">
+          {% if lp_batches %}
+          <p class="small text-muted mb-2">Click a batch to target only those investors. Click again to deselect.</p>
+          <div class="d-flex flex-wrap gap-2" id="lpBatchChips">
+            {% for b in lp_batches %}
+            <button type="button"
+                    class="btn btn-sm btn-outline-success batch-chip"
+                    data-batch-id="{{ b.id }}"
+                    data-audience="lp"
+                    onclick="toggleBatch(this)">
+              <i class="bi bi-collection me-1"></i>{{ b.label }}
+              <span class="badge bg-secondary ms-1" style="font-size:.65rem;">{{ b.count }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="small text-muted mb-0">No LP imports yet. Upload an investor file to create a batch.</p>
+          {% endif %}
         </div>
       </div>
 
@@ -187,6 +239,8 @@
     </div>
 
   </div>
+  <!-- Hidden batch_id inputs injected by JS -->
+  <div id="batchHiddenInputs"></div>
 </form>
 
 <script>
@@ -207,6 +261,10 @@ function setAudience(audience) {
   document.getElementById('gpFilter').style.display = isLP ? 'none' : '';
   document.getElementById('lpFilter').style.display = isLP ? '' : 'none';
 
+  // Toggle batch panels
+  document.getElementById('gpBatches').style.display = isLP ? 'none' : '';
+  document.getElementById('lpBatches').style.display = isLP ? '' : 'none';
+
   // Toggle merge field panels
   document.getElementById('gpMergeFields').style.display = isLP ? 'none' : '';
   document.getElementById('lpMergeFields').style.display = isLP ? '' : 'none';
@@ -214,6 +272,44 @@ function setAudience(audience) {
   // Enable/disable checkboxes so only the active set is submitted
   document.querySelectorAll('.gp-status-check').forEach(function(cb) { cb.disabled = isLP; });
   document.querySelectorAll('.lp-status-check').forEach(function(cb) { cb.disabled = !isLP; });
+
+  // Deselect all batch chips from the hidden audience
+  document.querySelectorAll('.batch-chip').forEach(function(chip) {
+    const chipAudience = chip.dataset.audience;
+    if ((isLP && chipAudience === 'gp') || (!isLP && chipAudience === 'lp')) {
+      chip.classList.remove('active-batch');
+      chip.classList.add('btn-outline-primary', 'btn-outline-success');
+    }
+  });
+  refreshBatchHiddenInputs();
+}
+
+function toggleBatch(chip) {
+  const isActive = chip.classList.contains('active-batch');
+  const audience = chip.dataset.audience;
+  const baseClass = audience === 'lp' ? 'btn-outline-success' : 'btn-outline-primary';
+  const activeClass = audience === 'lp' ? 'btn-success' : 'btn-primary';
+
+  if (isActive) {
+    chip.classList.remove('active-batch', activeClass);
+    chip.classList.add(baseClass);
+  } else {
+    chip.classList.add('active-batch', activeClass);
+    chip.classList.remove(baseClass);
+  }
+  refreshBatchHiddenInputs();
+}
+
+function refreshBatchHiddenInputs() {
+  const container = document.getElementById('batchHiddenInputs');
+  container.innerHTML = '';
+  document.querySelectorAll('.batch-chip.active-batch').forEach(function(chip) {
+    const inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = 'batch_ids';
+    inp.value = chip.dataset.batchId;
+    container.appendChild(inp);
+  });
 }
 
 // Load template into subject + body fields

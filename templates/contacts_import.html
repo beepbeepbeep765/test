@@ -18,6 +18,12 @@
     <div class="card border-0 shadow-sm">
       <div class="card-body p-4">
         <form method="POST" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Import Label <span class="text-danger">*</span></label>
+            <input type="text" name="import_label" class="form-control" required
+                   placeholder="e.g. Blackstone Q1 2026, Preqin Multifamily List" />
+            <div class="form-text">This name lets you select this batch when building campaigns.</div>
+          </div>
           <div class="mb-4">
             <label class="form-label fw-semibold">Preqin Export File <span class="text-danger">*</span></label>
             <input type="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required />
@@ -79,7 +85,8 @@
 <div class="alert alert-success border-0 d-flex align-items-center gap-2 mb-4">
   <i class="bi bi-check-circle-fill fs-5"></i>
   <div>
-    Found <strong>{{ row_count }} contacts</strong> ready to import.
+    Found <strong>{{ row_count }} contacts</strong> ready to import as
+    <strong>"{{ import_label or 'GP Import' }}"</strong>.
     Review the sample below, then click <strong>Confirm Import</strong> to add them all to your GP database.
   </div>
 </div>
@@ -162,6 +169,7 @@
   <!-- Re-submit original file with confirm flag via hidden form trick -->
   <form method="POST" action="{{ url_for('import_contacts_confirm') }}" class="d-inline" id="realConfirmForm">
     <input type="hidden" name="confirm" value="1" />
+    <input type="hidden" name="import_label" value="{{ import_label or '' }}" />
     {% for c in preview %}
     <input type="hidden" name="rows[{{ loop.index0 }}][name]" value="{{ c.name }}" />
     <input type="hidden" name="rows[{{ loop.index0 }}][company]" value="{{ c.company }}" />

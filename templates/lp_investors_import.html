@@ -18,6 +18,12 @@
     <div class="card border-0 shadow-sm">
       <div class="card-body p-4">
         <form method="POST" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Import Label <span class="text-danger">*</span></label>
+            <input type="text" name="import_label" class="form-control" required
+                   placeholder="e.g. Family Office List, Syndication Network Q1" />
+            <div class="form-text">This name lets you select this batch when building campaigns.</div>
+          </div>
           <div class="mb-4">
             <label class="form-label fw-semibold">LP Investor File <span class="text-danger">*</span></label>
             <input type="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required />
@@ -85,7 +91,8 @@
 <div class="alert alert-success border-0 d-flex align-items-center gap-2 mb-4">
   <i class="bi bi-check-circle-fill fs-5"></i>
   <div>
-    Found <strong>{{ row_count }} investors</strong> ready to import.
+    Found <strong>{{ row_count }} investors</strong> ready to import as
+    <strong>"{{ import_label or 'LP Import' }}"</strong>.
     Review the sample below, then click <strong>Confirm Import</strong> to add them all to your LP database.
   </div>
 </div>
@@ -163,6 +170,7 @@
     <i class="bi bi-arrow-left me-1"></i>Upload a different file
   </a>
   <form method="POST" action="{{ url_for('import_lp_investors_confirm') }}" class="d-inline">
+    <input type="hidden" name="import_label" value="{{ import_label or '' }}" />
     {% for inv in preview %}
     <input type="hidden" name="rows[{{ loop.index0 }}][name]" value="{{ inv.name }}" />
     <input type="hidden" name="rows[{{ loop.index0 }}][company]" value="{{ inv.company }}" />

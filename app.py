@@ -213,6 +213,14 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS import_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT NOT NULL,
+            type TEXT NOT NULL,
+            count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS campaigns (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -265,6 +273,8 @@ def init_db():
         "ALTER TABLE deals ADD COLUMN email_keywords TEXT",
         "ALTER TABLE campaigns ADD COLUMN target_audience TEXT DEFAULT 'gp'",
         "ALTER TABLE campaign_emails ADD COLUMN lp_investor_id INTEGER",
+        "ALTER TABLE gp_contacts ADD COLUMN import_batch_id INTEGER",
+        "ALTER TABLE lp_investors ADD COLUMN import_batch_id INTEGER",
     ]:
         try:
             conn.execute(stmt)
@@ -1695,6 +1705,12 @@ def campaigns():
 def new_campaign():
     conn = get_db()
     templates_list = conn.execute("SELECT * FROM email_templates ORDER BY name").fetchall()
+    gp_batches = conn.execute(
+        "SELECT * FROM import_batches WHERE type='gp' ORDER BY created_at DESC"
+    ).fetchall()
+    lp_batches = conn.execute(
+        "SELECT * FROM import_batches WHERE type='lp' ORDER BY created_at DESC"
+    ).fetchall()
 
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -1703,6 +1719,7 @@ def new_campaign():
         target_audience = request.form.get("target_audience", "gp")
 
         status_filter = request.form.getlist("status_filter")
+        selected_batch_ids = request.form.getlist("batch_ids")
 
         if target_audience == "lp":
             # Filter LP investors
@@ -1716,6 +1733,10 @@ def new_campaign():
             if asset_type_kw:
                 sql += " AND preferred_asset_types LIKE ?"
                 params.append(f"%{asset_type_kw}%")
+            if selected_batch_ids:
+                placeholders = ",".join("?" * len(selected_batch_ids))
+                sql += f" AND import_batch_id IN ({placeholders})"
+                params += selected_batch_ids
             sql += " ORDER BY name"
 
             recipients = conn.execute(sql, params).fetchall()
@@ -1723,7 +1744,8 @@ def new_campaign():
             if not recipients:
                 conn.close()
                 flash("No LP investors match those filters (or none have email addresses). Adjust filters and try again.", "warning")
-                return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+                return render_template("campaign_new.html", templates=templates_list,
+                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1753,6 +1775,10 @@ def new_campaign():
             if strategy_kw:
                 sql += " AND strategy LIKE ?"
                 params.append(f"%{strategy_kw}%")
+            if selected_batch_ids:
+                placeholders = ",".join("?" * len(selected_batch_ids))
+                sql += f" AND import_batch_id IN ({placeholders})"
+                params += selected_batch_ids
             sql += " ORDER BY name"
 
             recipients = conn.execute(sql, params).fetchall()
@@ -1760,7 +1786,8 @@ def new_campaign():
             if not recipients:
                 conn.close()
                 flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
-                return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+                return render_template("campaign_new.html", templates=templates_list,
+                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1784,7 +1811,8 @@ def new_campaign():
         return redirect(url_for("campaign_review", campaign_id=campaign_id))
 
     conn.close()
-    return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+    return render_template("campaign_new.html", templates=templates_list,
+                           gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
 
 @app.route("/campaigns/<int:campaign_id>/review")
@@ -2012,7 +2040,9 @@ def import_contacts():
         flash("No usable rows found. Make sure the file has contact name, company, or email columns.", "warning")
         return render_template("contacts_import.html")
 
-    return render_template("contacts_import.html", preview=preview, col_map=col_map, row_count=len(preview))
+    import_label = request.form.get("import_label", "").strip()
+    return render_template("contacts_import.html", preview=preview, col_map=col_map,
+                           row_count=len(preview), import_label=import_label)
 
 
 @app.route("/contacts/import/confirm", methods=["POST"])
@@ -2040,23 +2070,30 @@ def import_contacts_confirm():
         flash("No data received. Please re-upload your file.", "warning")
         return redirect(url_for("import_contacts"))
 
+    import_label = request.form.get("import_label", "").strip() or "GP Import"
+    valid_entries = [e for e in entries if e["name"] or e["email"]]
+
     conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO import_batches (label, type, count) VALUES (?, 'gp', ?)",
+        (import_label, len(valid_entries)),
+    )
+    batch_id = cur.lastrowid
+
     imported = 0
-    for entry in entries:
-        if not entry["name"] and not entry["email"]:
-            continue
+    for entry in valid_entries:
         name = entry["name"] or entry["company"] or "Unknown"
         conn.execute(
             "INSERT INTO gp_contacts (name, title, company, email, phone, location, "
-            "aum_range, strategy, min_check, max_check, source, status, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Preqin', 'New', ?)",
+            "aum_range, strategy, min_check, max_check, source, status, notes, import_batch_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Preqin', 'New', ?, ?)",
             (name, entry["title"], entry["company"], entry["email"], entry["phone"],
              entry["location"], entry["aum_range"], entry["strategy"],
-             entry["min_check"], entry["max_check"], entry["notes"]),
+             entry["min_check"], entry["max_check"], entry["notes"], batch_id),
         )
         imported += 1
     conn.commit(); conn.close()
-    flash(f"Imported {imported} GP contacts from Preqin.", "success")
+    flash(f"Imported {imported} GP contacts as "{import_label}".", "success")
     return redirect(url_for("contacts"))
 
 
@@ -2147,7 +2184,9 @@ def import_lp_investors():
         flash("No usable rows found. Make sure the file has a name, company, or email column.", "warning")
         return render_template("lp_investors_import.html")
 
-    return render_template("lp_investors_import.html", preview=preview, col_map=col_map, row_count=len(preview))
+    import_label = request.form.get("import_label", "").strip()
+    return render_template("lp_investors_import.html", preview=preview, col_map=col_map,
+                           row_count=len(preview), import_label=import_label)
 
 
 @app.route("/lp-investors/import/confirm", methods=["POST"])
@@ -2175,25 +2214,32 @@ def import_lp_investors_confirm():
         flash("No data received. Please re-upload your file.", "warning")
         return redirect(url_for("import_lp_investors"))
 
+    import_label = request.form.get("import_label", "").strip() or "LP Import"
+    valid_entries = [e for e in entries if e["name"] or e["email"]]
+
     conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO import_batches (label, type, count) VALUES (?, 'lp', ?)",
+        (import_label, len(valid_entries)),
+    )
+    batch_id = cur.lastrowid
+
     imported = 0
-    for entry in entries:
-        if not entry["name"] and not entry["email"]:
-            continue
+    for entry in valid_entries:
         name = entry["name"] or entry["company"] or "Unknown"
         conn.execute(
             "INSERT INTO lp_investors (name, title, company, email, phone, location, "
             "net_worth, preferred_asset_types, preferred_markets, min_check, max_check, "
-            "source, status, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Excel Import', 'New', ?)",
+            "source, status, notes, import_batch_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Excel Import', 'New', ?, ?)",
             (name, entry["title"], entry["company"], entry["email"], entry["phone"],
              entry["location"], entry["net_worth"], entry["preferred_asset_types"],
              entry["preferred_markets"], entry["min_check"], entry["max_check"],
-             entry["notes"]),
+             entry["notes"], batch_id),
         )
         imported += 1
     conn.commit(); conn.close()
-    flash(f"Imported {imported} LP investors.", "success")
+    flash(f"Imported {imported} LP investors as "{import_label}".", "success")
     return redirect(url_for("lp_investors"))
 
 
