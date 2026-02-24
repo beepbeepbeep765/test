@@ -4,7 +4,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 class="fw-bold mb-1"><i class="bi bi-plus-circle me-2" style="color:var(--acre-gold)"></i>New Campaign</h4>
-    <p class="text-muted small mb-0">Filter your GP contacts, write your email, and generate drafts to review before sending.</p>
+    <p class="text-muted small mb-0">Filter your contacts, write your email, and generate drafts to review before sending.</p>
   </div>
   <a href="{{ url_for('campaigns') }}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Back
@@ -12,6 +12,8 @@
 </div>
 
 <form method="POST">
+  <input type="hidden" name="target_audience" id="targetAudience" value="gp" />
+
   <div class="row g-4">
 
     <!-- Left column: settings -->
@@ -25,12 +27,26 @@
           <div class="mb-3">
             <label class="form-label fw-semibold small">Campaign Name <span class="text-danger">*</span></label>
             <input type="text" name="name" class="form-control" required
-                   placeholder="e.g. Feb 2026 GP Blast" />
+                   placeholder="e.g. Feb 2026 LP Blast" />
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold small">Audience</label>
+            <div class="btn-group w-100" role="group">
+              <button type="button" id="btnGP" class="btn btn-primary btn-sm active-audience"
+                      onclick="setAudience('gp')">
+                <i class="bi bi-building me-1"></i>GP Contacts
+              </button>
+              <button type="button" id="btnLP" class="btn btn-outline-primary btn-sm"
+                      onclick="setAudience('lp')">
+                <i class="bi bi-person-check me-1"></i>LP Investors
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="card border-0 shadow-sm mb-4">
+      <!-- GP Filter -->
+      <div id="gpFilter" class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-transparent border-0 pb-0 pt-3">
           <span class="fw-semibold small text-muted text-uppercase">GP Filter</span>
         </div>
@@ -43,7 +59,7 @@
             <div class="d-flex flex-wrap gap-2">
               {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Hot Lead'] %}
               <div class="form-check form-check-inline m-0">
-                <input class="form-check-input" type="checkbox" name="status_filter"
+                <input class="form-check-input gp-status-check" type="checkbox" name="status_filter"
                        value="{{ s }}" id="st_{{ loop.index }}" checked />
                 <label class="form-check-label small" for="st_{{ loop.index }}">{{ s }}</label>
               </div>
@@ -56,6 +72,37 @@
             <input type="text" name="strategy_kw" class="form-control form-control-sm"
                    placeholder="e.g. multifamily, value-add" />
             <div class="form-text">Leave blank to include all strategies.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LP Filter -->
+      <div id="lpFilter" class="card border-0 shadow-sm mb-4" style="display:none;">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3">
+          <span class="fw-semibold small text-muted text-uppercase">LP Filter</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted mb-3">
+            Only LP investors with an email address will be included. Narrow by status or asset type below.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Status</label>
+            <div class="d-flex flex-wrap gap-2">
+              {% for s in ['New', 'In Contact', 'Meeting Scheduled', 'Hot Lead', 'Committed'] %}
+              <div class="form-check form-check-inline m-0">
+                <input class="form-check-input lp-status-check" type="checkbox" name="status_filter"
+                       value="{{ s }}" id="lp_st_{{ loop.index }}" checked />
+                <label class="form-check-label small" for="lp_st_{{ loop.index }}">{{ s }}</label>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="form-text">Uncheck any statuses you want to exclude.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold small">Asset type keyword (optional)</label>
+            <input type="text" name="asset_type_kw" class="form-control form-control-sm"
+                   placeholder="e.g. multifamily, industrial" />
+            <div class="form-text">Leave blank to include all asset types.</div>
           </div>
         </div>
       </div>
@@ -77,11 +124,27 @@
         </div>
       </div>
 
-      <div class="card border-0 shadow-sm bg-light">
+      <!-- GP merge fields -->
+      <div id="gpMergeFields" class="card border-0 shadow-sm bg-light">
         <div class="card-body py-3">
           <p class="small text-muted mb-2"><strong>Available merge fields:</strong></p>
           <div class="d-flex flex-wrap gap-1">
             {% for f in ['{first_name}', '{full_name}', '{company}', '{strategy}', '{location}', '{aum}'] %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    style="font-size:.75rem;"
+                    onclick="insertMerge(this, '{{ f }}')">{{ f }}</button>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-2">Click to insert at cursor in the body field.</div>
+        </div>
+      </div>
+
+      <!-- LP merge fields -->
+      <div id="lpMergeFields" class="card border-0 shadow-sm bg-light" style="display:none;">
+        <div class="card-body py-3">
+          <p class="small text-muted mb-2"><strong>Available merge fields:</strong></p>
+          <div class="d-flex flex-wrap gap-1">
+            {% for f in ['{first_name}', '{full_name}', '{company}', '{asset_types}', '{markets}'] %}
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                     style="font-size:.75rem;"
                     onclick="insertMerge(this, '{{ f }}')">{{ f }}</button>
@@ -111,7 +174,7 @@
                       rows="18" required
                       placeholder="Hi {first_name},&#10;&#10;I hope you're doing well..."></textarea>
             <div class="form-text">
-              Use <code>{first_name}</code>, <code>{company}</code> etc. as merge fields — they'll be personalized per GP.
+              Use merge fields on the left — they'll be personalized per recipient.
             </div>
           </div>
         </div>
@@ -127,6 +190,32 @@
 </form>
 
 <script>
+function setAudience(audience) {
+  document.getElementById('targetAudience').value = audience;
+
+  const isLP = audience === 'lp';
+
+  // Toggle buttons
+  document.getElementById('btnGP').className = isLP
+    ? 'btn btn-outline-primary btn-sm'
+    : 'btn btn-primary btn-sm';
+  document.getElementById('btnLP').className = isLP
+    ? 'btn btn-primary btn-sm'
+    : 'btn btn-outline-primary btn-sm';
+
+  // Toggle filter panels
+  document.getElementById('gpFilter').style.display = isLP ? 'none' : '';
+  document.getElementById('lpFilter').style.display = isLP ? '' : 'none';
+
+  // Toggle merge field panels
+  document.getElementById('gpMergeFields').style.display = isLP ? 'none' : '';
+  document.getElementById('lpMergeFields').style.display = isLP ? '' : 'none';
+
+  // Enable/disable checkboxes so only the active set is submitted
+  document.querySelectorAll('.gp-status-check').forEach(function(cb) { cb.disabled = isLP; });
+  document.querySelectorAll('.lp-status-check').forEach(function(cb) { cb.disabled = !isLP; });
+}
+
 // Load template into subject + body fields
 document.getElementById('templatePicker').addEventListener('change', function() {
   const opt = this.options[this.selectedIndex];
@@ -145,5 +234,8 @@ function insertMerge(btn, field) {
   ta.selectionStart = ta.selectionEnd = start + field.length;
   ta.focus();
 }
+
+// Init: disable LP checkboxes on load (GP is default)
+document.querySelectorAll('.lp-status-check').forEach(function(cb) { cb.disabled = true; });
 </script>
 {% endblock %}

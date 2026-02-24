@@ -40,6 +40,11 @@
             <a href="{{ url_for('campaign_review', campaign_id=c.id) }}" class="text-decoration-none text-dark">
               {{ c.name }}
             </a>
+            {% if c.target_audience == 'lp' %}
+            <span class="badge bg-info text-dark ms-1" style="font-size:.65rem;">LP</span>
+            {% else %}
+            <span class="badge bg-secondary ms-1" style="font-size:.65rem;">GP</span>
+            {% endif %}
           </td>
           <td class="text-muted small">{{ c.subject[:60] }}{% if c.subject|length > 60 %}…{% endif %}</td>
           <td class="text-center">{{ c.total_count }}</td>

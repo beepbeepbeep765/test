@@ -263,6 +263,8 @@ def init_db():
         "ALTER TABLE emails ADD COLUMN direction TEXT DEFAULT 'sent'",
         "ALTER TABLE emails ADD COLUMN tags TEXT",
         "ALTER TABLE deals ADD COLUMN email_keywords TEXT",
+        "ALTER TABLE campaigns ADD COLUMN target_audience TEXT DEFAULT 'gp'",
+        "ALTER TABLE campaign_emails ADD COLUMN lp_investor_id INTEGER",
     ]:
         try:
             conn.execute(stmt)
@@ -1659,6 +1661,23 @@ def _apply_merge(text, contact):
             .replace("{aum}", aum))
 
 
+def _apply_merge_lp(text, investor):
+    """Replace {merge_fields} in text with LP investor data."""
+    if not text:
+        return text
+    name = investor["name"] or ""
+    first_name = name.split()[0] if name else ""
+    company = investor["company"] or "your firm"
+    asset_types = investor["preferred_asset_types"] or ""
+    markets = investor["preferred_markets"] or ""
+    return (text
+            .replace("{first_name}", first_name)
+            .replace("{full_name}", name)
+            .replace("{company}", company)
+            .replace("{asset_types}", asset_types)
+            .replace("{markets}", markets))
+
+
 @app.route("/campaigns")
 def campaigns():
     conn = get_db()
@@ -1681,49 +1700,87 @@ def new_campaign():
         name = request.form["name"].strip()
         subject = request.form["subject"].strip()
         body = request.form["body"].strip()
+        target_audience = request.form.get("target_audience", "gp")
 
-        # Filter GPs
-        sql = "SELECT * FROM gp_contacts WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
-        params = []
         status_filter = request.form.getlist("status_filter")
-        strategy_kw = request.form.get("strategy_kw", "").strip()
-        if status_filter:
-            placeholders = ",".join("?" * len(status_filter))
-            sql += f" AND status IN ({placeholders})"
-            params += status_filter
-        if strategy_kw:
-            sql += " AND strategy LIKE ?"
-            params.append(f"%{strategy_kw}%")
-        sql += " ORDER BY name"
 
-        gps = conn.execute(sql, params).fetchall()
+        if target_audience == "lp":
+            # Filter LP investors
+            sql = "SELECT * FROM lp_investors WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+            params = []
+            if status_filter:
+                placeholders = ",".join("?" * len(status_filter))
+                sql += f" AND status IN ({placeholders})"
+                params += status_filter
+            asset_type_kw = request.form.get("asset_type_kw", "").strip()
+            if asset_type_kw:
+                sql += " AND preferred_asset_types LIKE ?"
+                params.append(f"%{asset_type_kw}%")
+            sql += " ORDER BY name"
 
-        if not gps:
-            conn.close()
-            flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
-            return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+            recipients = conn.execute(sql, params).fetchall()
 
-        # Save campaign
-        cur = conn.execute(
-            "INSERT INTO campaigns (name, subject, body_template) VALUES (?, ?, ?)",
-            (name, subject, body),
-        )
-        campaign_id = cur.lastrowid
+            if not recipients:
+                conn.close()
+                flash("No LP investors match those filters (or none have email addresses). Adjust filters and try again.", "warning")
+                return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
 
-        # Generate draft emails
-        for gp in gps:
-            rendered_subject = _apply_merge(subject, gp)
-            rendered_body = _apply_merge(body, gp)
-            conn.execute(
-                "INSERT INTO campaign_emails (campaign_id, contact_id, to_name, to_email, company, subject, body) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (campaign_id, gp["id"], gp["name"], gp["email"], gp["company"],
-                 rendered_subject, rendered_body),
+            cur = conn.execute(
+                "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
+                (name, subject, body, "lp"),
             )
+            campaign_id = cur.lastrowid
+
+            for inv in recipients:
+                rendered_subject = _apply_merge_lp(subject, inv)
+                rendered_body = _apply_merge_lp(body, inv)
+                conn.execute(
+                    "INSERT INTO campaign_emails (campaign_id, lp_investor_id, to_name, to_email, company, subject, body) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (campaign_id, inv["id"], inv["name"], inv["email"], inv["company"],
+                     rendered_subject, rendered_body),
+                )
+
+        else:
+            # Filter GPs
+            sql = "SELECT * FROM gp_contacts WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+            params = []
+            if status_filter:
+                placeholders = ",".join("?" * len(status_filter))
+                sql += f" AND status IN ({placeholders})"
+                params += status_filter
+            strategy_kw = request.form.get("strategy_kw", "").strip()
+            if strategy_kw:
+                sql += " AND strategy LIKE ?"
+                params.append(f"%{strategy_kw}%")
+            sql += " ORDER BY name"
+
+            recipients = conn.execute(sql, params).fetchall()
+
+            if not recipients:
+                conn.close()
+                flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
+                return render_template("campaign_new.html", templates=templates_list, title="New Campaign")
+
+            cur = conn.execute(
+                "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
+                (name, subject, body, "gp"),
+            )
+            campaign_id = cur.lastrowid
+
+            for gp in recipients:
+                rendered_subject = _apply_merge(subject, gp)
+                rendered_body = _apply_merge(body, gp)
+                conn.execute(
+                    "INSERT INTO campaign_emails (campaign_id, contact_id, to_name, to_email, company, subject, body) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (campaign_id, gp["id"], gp["name"], gp["email"], gp["company"],
+                     rendered_subject, rendered_body),
+                )
 
         conn.commit()
         conn.close()
-        flash(f"Generated {len(gps)} draft emails. Review them below then send.", "success")
+        flash(f"Generated {len(recipients)} draft emails. Review them below then send.", "success")
         return redirect(url_for("campaign_review", campaign_id=campaign_id))
 
     conn.close()
@@ -1823,6 +1880,12 @@ def campaign_send(campaign_id):
                     "INSERT INTO contact_notes (contact_id, note_date, note_text) VALUES (?, ?, ?)",
                     (row["contact_id"], today,
                      f"[Campaign: {campaign['name']}] Email sent — Subject: {row['subject']}"),
+                )
+            # Update LP last_contacted
+            if row["lp_investor_id"]:
+                conn.execute(
+                    "UPDATE lp_investors SET last_contacted=? WHERE id=?",
+                    (today, row["lp_investor_id"]),
                 )
 
     # Mark campaign as sent if all emails done
