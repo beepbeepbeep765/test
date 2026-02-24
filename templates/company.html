@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ company_name }} — ACRE CRM{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <div>
+    <h2 class="fw-bold mb-0"><i class="bi bi-building me-2" style="color:var(--acre-gold)"></i>{{ company_name }}</h2>
+    <p class="text-muted small mb-0">
+      {{ gp_contacts|length }} GP contact{{ 's' if gp_contacts|length != 1 }} &nbsp;·&nbsp;
+      {{ lp_investors|length }} LP investor{{ 's' if lp_investors|length != 1 }}
+    </p>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+
+  {% if gp_contacts %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3 fw-semibold">
+        <i class="bi bi-building me-2 text-primary"></i>GP Contacts
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for c in gp_contacts %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+              {% if c.title %}<div class="text-muted small">{{ c.title }}</div>{% endif %}
+              {% if c.email %}<div class="small"><a href="mailto:{{ c.email }}">{{ c.email }}</a></div>{% endif %}
+            </div>
+            <div class="text-end">
+              <span class="badge {% if c.status == 'Hot Lead' %}bg-danger{% elif c.status == 'In Contact' %}bg-primary{% elif c.status == 'Meeting Scheduled' %}bg-success{% elif c.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %} small">
+                {{ c.status }}
+              </span>
+              {% if c.last_contacted %}
+              <div class="text-muted" style="font-size:.72rem;">Last: {{ c.last_contacted }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if lp_investors %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3 fw-semibold">
+        <i class="bi bi-person-check me-2 text-success"></i>LP Investors
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for inv in lp_investors %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <a href="{{ url_for('lp_investor_detail', investor_id=inv.id) }}" class="fw-semibold text-decoration-none">{{ inv.name }}</a>
+              {% if inv.title %}<div class="text-muted small">{{ inv.title }}</div>{% endif %}
+              {% if inv.email %}<div class="small"><a href="mailto:{{ inv.email }}">{{ inv.email }}</a></div>{% endif %}
+            </div>
+            <div class="text-end">
+              <span class="badge {% if inv.status == 'Hot Lead' %}bg-danger{% elif inv.status == 'Committed' %}bg-success{% elif inv.status == 'In Contact' %}bg-primary{% elif inv.status == 'Meeting Scheduled' %}bg-info text-dark{% elif inv.status == 'Passed' %}bg-secondary{% else %}bg-light text-dark border{% endif %} small">
+                {{ inv.status }}
+              </span>
+              {% if inv.last_contacted %}
+              <div class="text-muted" style="font-size:.72rem;">Last: {{ inv.last_contacted }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not gp_contacts and not lp_investors %}
+  <div class="col-12">
+    <div class="alert alert-info">No contacts found for "{{ company_name }}".</div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Full activity timeline -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2 text-primary"></i>All Activity</h5>
+  </div>
+  <div class="card-body">
+    {% if activity %}
+    <ul class="list-group list-group-flush">
+      {% for n in activity %}
+      <li class="list-group-item px-0">
+        <div class="d-flex gap-3 align-items-start">
+          <span class="text-muted small text-nowrap" style="min-width:80px;">{{ n.note_date or '—' }}</span>
+          <div class="flex-grow-1">
+            <span class="badge {% if n.kind == 'lp' %}bg-success-subtle text-success{% else %}bg-primary-subtle text-primary{% endif %} small me-1">
+              {{ n.person_name }}
+            </span>
+            <span>{{ n.note_text }}</span>
+            {% if n.note_html %}
+            <div class="mt-1">
+              <button class="btn btn-link btn-sm p-0 text-muted" style="font-size:.75rem;"
+                      onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Show')?'Hide email':'Show email'">
+                Show email
+              </button>
+              <div style="display:none;margin-top:6px;padding:10px;background:#f8f9fa;border-radius:6px;font-size:.85rem;line-height:1.6;border:1px solid #dee2e6;">
+                {{ n.note_html | safe }}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">No activity logged yet for this firm.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -136,8 +136,19 @@ def init_db():
             contact_id INTEGER NOT NULL,
             note_date TEXT,
             note_text TEXT NOT NULL,
+            note_html TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (contact_id) REFERENCES gp_contacts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS lp_investor_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            investor_id INTEGER NOT NULL,
+            note_date TEXT,
+            note_text TEXT NOT NULL,
+            note_html TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (investor_id) REFERENCES lp_investors(id)
         );
 
         CREATE TABLE IF NOT EXISTS email_templates (
@@ -275,6 +286,7 @@ def init_db():
         "ALTER TABLE campaign_emails ADD COLUMN lp_investor_id INTEGER",
         "ALTER TABLE gp_contacts ADD COLUMN import_batch_id INTEGER",
         "ALTER TABLE lp_investors ADD COLUMN import_batch_id INTEGER",
+        "ALTER TABLE contact_notes ADD COLUMN note_html TEXT",
     ]:
         try:
             conn.execute(stmt)
@@ -826,6 +838,42 @@ def delete_contact_note(contact_id, note_id):
     conn.commit(); conn.close()
     flash("Note deleted.", "info")
     return redirect(url_for("contact_detail", contact_id=contact_id))
+
+
+@app.route("/company")
+def company_view():
+    name = request.args.get("name", "").strip()
+    if not name:
+        return redirect(url_for("contacts"))
+    conn = get_db()
+    gp_contacts = conn.execute(
+        "SELECT * FROM gp_contacts WHERE company = ? ORDER BY name", (name,)
+    ).fetchall()
+    lp_investors = conn.execute(
+        "SELECT * FROM lp_investors WHERE company = ? ORDER BY name", (name,)
+    ).fetchall()
+
+    # Gather all activity: contact_notes for GPs, lp_investor_notes for LPs
+    activity = []
+    for c in gp_contacts:
+        rows = conn.execute(
+            "SELECT *, 'gp' as kind, ? as person_name, ? as person_id FROM contact_notes WHERE contact_id = ?",
+            (c["name"], c["id"], c["id"])
+        ).fetchall()
+        activity.extend(rows)
+    for inv in lp_investors:
+        rows = conn.execute(
+            "SELECT *, 'lp' as kind, ? as person_name, ? as person_id FROM lp_investor_notes WHERE investor_id = ?",
+            (inv["name"], inv["id"], inv["id"])
+        ).fetchall()
+        activity.extend(rows)
+
+    # Sort activity by date desc
+    activity.sort(key=lambda r: (r["note_date"] or ""), reverse=True)
+    conn.close()
+    return render_template("company.html", company_name=name,
+                           gp_contacts=gp_contacts, lp_investors=lp_investors,
+                           activity=activity)
 
 
 # ── Email Templates ────────────────────────────────────────────────────────────
@@ -1473,10 +1521,38 @@ def new_lp_investor():
 def lp_investor_detail(investor_id):
     conn = get_db()
     investor = conn.execute("SELECT * FROM lp_investors WHERE id = ?", (investor_id,)).fetchone()
-    conn.close()
     if not investor:
-        flash("Investor not found.", "danger"); return redirect(url_for("lp_investors"))
-    return render_template("lp_investor_detail.html", investor=investor)
+        conn.close(); flash("Investor not found.", "danger"); return redirect(url_for("lp_investors"))
+    notes = conn.execute(
+        "SELECT * FROM lp_investor_notes WHERE investor_id = ? ORDER BY note_date DESC, created_at DESC",
+        (investor_id,)
+    ).fetchall()
+    conn.close()
+    return render_template("lp_investor_detail.html", investor=investor, notes=notes)
+
+
+@app.route("/lp-investors/<int:investor_id>/notes/add", methods=["POST"])
+def add_lp_investor_note(investor_id):
+    conn = get_db()
+    note_date = request.form.get("note_date") or date.today().isoformat()
+    note_text = request.form.get("note_text", "").strip()
+    if note_text:
+        conn.execute(
+            "INSERT INTO lp_investor_notes (investor_id, note_date, note_text) VALUES (?, ?, ?)",
+            (investor_id, note_date, note_text),
+        )
+        conn.commit()
+    conn.close()
+    return redirect(url_for("lp_investor_detail", investor_id=investor_id))
+
+
+@app.route("/lp-investors/<int:investor_id>/notes/<int:note_id>/delete", methods=["POST"])
+def delete_lp_investor_note(investor_id, note_id):
+    conn = get_db()
+    conn.execute("DELETE FROM lp_investor_notes WHERE id = ? AND investor_id = ?", (note_id, investor_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("lp_investor_detail", investor_id=investor_id))
 
 
 @app.route("/lp-investors/<int:investor_id>/edit", methods=["GET", "POST"])
@@ -1956,15 +2032,22 @@ def campaign_send(campaign_id):
                     (today, row["contact_id"]),
                 )
                 conn.execute(
-                    "INSERT INTO contact_notes (contact_id, note_date, note_text) VALUES (?, ?, ?)",
+                    "INSERT INTO contact_notes (contact_id, note_date, note_text, note_html) VALUES (?, ?, ?, ?)",
                     (row["contact_id"], today,
-                     f"[Campaign: {campaign['name']}] Email sent — Subject: {row['subject']}"),
+                     f"[Campaign: {campaign['name']}] Email sent — Subject: {row['subject']}",
+                     row["body"]),
                 )
             # Update LP last_contacted
             if row["lp_investor_id"]:
                 conn.execute(
                     "UPDATE lp_investors SET last_contacted=? WHERE id=?",
                     (today, row["lp_investor_id"]),
+                )
+                conn.execute(
+                    "INSERT INTO lp_investor_notes (investor_id, note_date, note_text, note_html) VALUES (?, ?, ?, ?)",
+                    (row["lp_investor_id"], today,
+                     f"[Campaign: {campaign['name']}] Email sent — Subject: {row['subject']}",
+                     row["body"]),
                 )
 
     # Mark campaign as sent if all emails done

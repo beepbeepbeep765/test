@@ -62,7 +62,7 @@
               <a href="{{ url_for('lp_investor_detail', investor_id=inv.id) }}" class="text-decoration-none fw-semibold">{{ inv.name }}</a>
               {% if inv.title %}<div class="text-muted small">{{ inv.title }}</div>{% endif %}
             </td>
-            <td>{{ inv.company or '—' }}</td>
+            <td>{% if inv.company %}<a href="{{ url_for('company_view') }}?name={{ inv.company | urlencode }}" class="text-decoration-none">{{ inv.company }}</a>{% else %}—{% endif %}</td>
             <td class="text-muted small">{{ inv.preferred_asset_types or '—' }}</td>
             <td class="text-muted small">
               {% if inv.min_check or inv.max_check %}{{ inv.min_check or '' }}{% if inv.min_check and inv.max_check %}–{% endif %}{{ inv.max_check or '' }}

@@ -24,7 +24,7 @@
           <dt class="col-5 text-muted">Phone</dt>
           <dd class="col-7">{{ contact.phone or '—' }}</dd>
           <dt class="col-5 text-muted">Company</dt>
-          <dd class="col-7">{{ contact.company or '—' }}</dd>
+          <dd class="col-7">{% if contact.company %}<a href="{{ url_for('company_view') }}?name={{ contact.company | urlencode }}">{{ contact.company }}</a>{% else %}—{% endif %}</dd>
           <dt class="col-5 text-muted">Location</dt>
           <dd class="col-7">{{ contact.location or '—' }}</dd>
           <dt class="col-5 text-muted">Status</dt>
@@ -95,15 +95,30 @@
     {% if notes %}
     <ul class="list-group list-group-flush">
       {% for n in notes %}
-      <li class="list-group-item px-0 d-flex align-items-start justify-content-between gap-3">
-        <div class="d-flex gap-3">
-          <span class="text-muted small text-nowrap">{{ n.note_date or '—' }}</span>
-          <span>{{ n.note_text }}</span>
+      <li class="list-group-item px-0">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div class="d-flex gap-3 flex-grow-1">
+            <span class="text-muted small text-nowrap">{{ n.note_date or '—' }}</span>
+            <div class="flex-grow-1">
+              <span>{{ n.note_text }}</span>
+              {% if n.note_html %}
+              <div class="mt-1">
+                <button class="btn btn-link btn-sm p-0 text-muted" style="font-size:.75rem;"
+                        onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Show')?'Hide email':'Show email'">
+                  Show email
+                </button>
+                <div style="display:none;margin-top:6px;padding:10px;background:#f8f9fa;border-radius:6px;font-size:.85rem;line-height:1.6;border:1px solid #dee2e6;">
+                  {{ n.note_html | safe }}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <form method="POST" action="{{ url_for('delete_contact_note', contact_id=contact.id, note_id=n.id) }}"
+                onsubmit="return confirm('Delete this note?')" class="flex-shrink-0">
+            <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+          </form>
         </div>
-        <form method="POST" action="{{ url_for('delete_contact_note', contact_id=contact.id, note_id=n.id) }}"
-              onsubmit="return confirm('Delete this note?')" class="flex-shrink-0">
-          <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
-        </form>
       </li>
       {% endfor %}
     </ul>

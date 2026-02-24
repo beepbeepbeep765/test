@@ -66,7 +66,7 @@
               <a href="{{ url_for('contact_detail', contact_id=c.id) }}" class="text-decoration-none fw-semibold">{{ c.name }}</a>
               {% if c.title %}<div class="text-muted small">{{ c.title }}</div>{% endif %}
             </td>
-            <td>{{ c.company or '—' }}</td>
+            <td>{% if c.company %}<a href="{{ url_for('company_view') }}?name={{ c.company | urlencode }}" class="text-decoration-none">{{ c.company }}</a>{% else %}—{% endif %}</td>
             <td class="text-muted small">{{ c.strategy or '—' }}</td>
             <td class="text-muted small">
               {% if c.min_check or c.max_check %}{{ c.min_check or '' }}{% if c.min_check and c.max_check %}–{% endif %}{{ c.max_check or '' }}

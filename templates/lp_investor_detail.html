@@ -24,7 +24,7 @@
           <dt class="col-5 text-muted">Phone</dt>
           <dd class="col-7">{{ investor.phone or '—' }}</dd>
           <dt class="col-5 text-muted">Company</dt>
-          <dd class="col-7">{{ investor.company or '—' }}</dd>
+          <dd class="col-7">{% if investor.company %}<a href="{{ url_for('company_view') }}?name={{ investor.company | urlencode }}">{{ investor.company }}</a>{% else %}—{% endif %}</dd>
           <dt class="col-5 text-muted">Location</dt>
           <dd class="col-7">{{ investor.location or '—' }}</dd>
           <dt class="col-5 text-muted">Accredited</dt>
@@ -73,6 +73,64 @@
         {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Activity Log -->
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-header bg-white py-3">
+    <h5 class="mb-0 fw-semibold"><i class="bi bi-journal-text me-2 text-primary"></i>Activity Log</h5>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('add_lp_investor_note', investor_id=investor.id) }}" class="mb-4">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold small">Date</label>
+          <input type="date" name="note_date" class="form-control form-control-sm" />
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold small">Note</label>
+          <input type="text" name="note_text" class="form-control form-control-sm"
+                 placeholder="Quick note — call outcome, what they said, next steps..." required />
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Add Note</button>
+        </div>
+      </div>
+    </form>
+    {% if notes %}
+    <ul class="list-group list-group-flush">
+      {% for n in notes %}
+      <li class="list-group-item px-0">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div class="d-flex gap-3 flex-grow-1">
+            <span class="text-muted small text-nowrap">{{ n.note_date or '—' }}</span>
+            <div class="flex-grow-1">
+              <span>{{ n.note_text }}</span>
+              {% if n.note_html %}
+              <div class="mt-1">
+                <button class="btn btn-link btn-sm p-0 text-muted" style="font-size:.75rem;"
+                        onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Show')?'Hide email':'Show email'">
+                  Show email
+                </button>
+                <div style="display:none;margin-top:6px;padding:10px;background:#f8f9fa;border-radius:6px;font-size:.85rem;line-height:1.6;border:1px solid #dee2e6;">
+                  {{ n.note_html | safe }}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <form method="POST" action="{{ url_for('delete_lp_investor_note', investor_id=investor.id, note_id=n.id) }}"
+                onsubmit="return confirm('Delete this note?')" class="flex-shrink-0">
+            <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">No activity yet. Notes will appear here after calls, meetings, or email blasts.</p>
+    {% endif %}
   </div>
 </div>
 
