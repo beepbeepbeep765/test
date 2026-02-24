@@ -2093,7 +2093,7 @@ def import_contacts_confirm():
         )
         imported += 1
     conn.commit(); conn.close()
-    flash(f"Imported {imported} GP contacts as "{import_label}".", "success")
+    flash(f"Imported {imported} GP contacts as '{import_label}'.", "success")
     return redirect(url_for("contacts"))
 
 
@@ -2239,7 +2239,7 @@ def import_lp_investors_confirm():
         )
         imported += 1
     conn.commit(); conn.close()
-    flash(f"Imported {imported} LP investors as "{import_label}".", "success")
+    flash(f"Imported {imported} LP investors as '{import_label}'.", "success")
     return redirect(url_for("lp_investors"))
 
 
