@@ -71,6 +71,40 @@
         </div>
       </div>
 
+      <!-- GP Hand-pick -->
+      <div id="gpHandpick" class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3 d-flex justify-content-between align-items-center">
+          <span class="fw-semibold small text-muted text-uppercase">Hand-pick Individuals</span>
+          <span class="badge bg-primary" id="gpPickBadge" style="display:none!important;">0 selected</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted mb-2">Select specific GP contacts. If any are checked, <strong>only those contacts</strong> will receive the campaign (filters above are ignored).</p>
+          <input type="text" id="gpSearchInput" class="form-control form-control-sm mb-2"
+                 placeholder="Search name, firm, email…" oninput="filterGPList()">
+          <div id="gpContactList" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:6px;">
+            {% for gp in all_gp_contacts %}
+            <div class="gp-pick-item d-flex align-items-center py-1 px-1"
+                 data-search="{{ ((gp.name or '') + ' ' + (gp.company or '') + ' ' + (gp.email or '')) | lower }}">
+              <input type="checkbox" class="form-check-input me-2 flex-shrink-0 gp-handpick-check"
+                     name="gp_handpick_ids" value="{{ gp.id }}" id="gp_pick_{{ gp.id }}"
+                     onchange="updateGPPickCount()">
+              <label class="form-check-label small w-100" for="gp_pick_{{ gp.id }}" style="cursor:pointer;">
+                <span class="fw-semibold">{{ gp.name }}</span>
+                {% if gp.company %}<span class="text-muted"> · {{ gp.company }}</span>{% endif %}
+                {% if gp.email %}<span class="text-muted" style="font-size:.75rem;"> · {{ gp.email }}</span>{% endif %}
+              </label>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0 p-2">No GP contacts found.</p>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-1 d-flex align-items-center gap-2">
+            <span id="gpPickCount">0</span> selected
+            <button type="button" class="btn btn-link btn-sm py-0 px-0" onclick="clearGPPicks()">Clear all</button>
+          </div>
+        </div>
+      </div>
+
       <!-- GP Filter -->
       <div id="gpFilter" class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-transparent border-0 pb-0 pt-3">
@@ -125,6 +159,40 @@
           {% else %}
           <p class="small text-muted mb-0">No LP imports yet. Upload an investor file to create a batch.</p>
           {% endif %}
+        </div>
+      </div>
+
+      <!-- LP Hand-pick -->
+      <div id="lpHandpick" class="card border-0 shadow-sm mb-4" style="display:none;">
+        <div class="card-header bg-transparent border-0 pb-0 pt-3 d-flex justify-content-between align-items-center">
+          <span class="fw-semibold small text-muted text-uppercase">Hand-pick Individuals</span>
+          <span class="badge bg-success" id="lpPickBadge" style="display:none!important;">0 selected</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted mb-2">Select specific LP investors. If any are checked, <strong>only those investors</strong> will receive the campaign (filters above are ignored).</p>
+          <input type="text" id="lpSearchInput" class="form-control form-control-sm mb-2"
+                 placeholder="Search name, firm, email…" oninput="filterLPList()">
+          <div id="lpContactList" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:6px;">
+            {% for inv in all_lp_investors %}
+            <div class="lp-pick-item d-flex align-items-center py-1 px-1"
+                 data-search="{{ ((inv.name or '') + ' ' + (inv.company or '') + ' ' + (inv.email or '')) | lower }}">
+              <input type="checkbox" class="form-check-input me-2 flex-shrink-0 lp-handpick-check"
+                     name="lp_handpick_ids" value="{{ inv.id }}" id="lp_pick_{{ inv.id }}"
+                     onchange="updateLPPickCount()">
+              <label class="form-check-label small w-100" for="lp_pick_{{ inv.id }}" style="cursor:pointer;">
+                <span class="fw-semibold">{{ inv.name }}</span>
+                {% if inv.company %}<span class="text-muted"> · {{ inv.company }}</span>{% endif %}
+                {% if inv.email %}<span class="text-muted" style="font-size:.75rem;"> · {{ inv.email }}</span>{% endif %}
+              </label>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0 p-2">No LP investors found.</p>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-1 d-flex align-items-center gap-2">
+            <span id="lpPickCount">0</span> selected
+            <button type="button" class="btn btn-link btn-sm py-0 px-0" onclick="clearLPPicks()">Clear all</button>
+          </div>
         </div>
       </div>
 
@@ -265,6 +333,10 @@ function setAudience(audience) {
   document.getElementById('gpBatches').style.display = isLP ? 'none' : '';
   document.getElementById('lpBatches').style.display = isLP ? '' : 'none';
 
+  // Toggle hand-pick panels
+  document.getElementById('gpHandpick').style.display = isLP ? 'none' : '';
+  document.getElementById('lpHandpick').style.display = isLP ? '' : 'none';
+
   // Toggle merge field panels
   document.getElementById('gpMergeFields').style.display = isLP ? 'none' : '';
   document.getElementById('lpMergeFields').style.display = isLP ? '' : 'none';
@@ -282,6 +354,9 @@ function setAudience(audience) {
     }
   });
   refreshBatchHiddenInputs();
+
+  // Clear hand-picks for the hidden audience
+  if (isLP) { clearGPPicks(); } else { clearLPPicks(); }
 }
 
 function toggleBatch(chip) {
@@ -333,5 +408,43 @@ function insertMerge(btn, field) {
 
 // Init: disable LP checkboxes on load (GP is default)
 document.querySelectorAll('.lp-status-check').forEach(function(cb) { cb.disabled = true; });
+
+// ── Hand-pick: GP ──
+function filterGPList() {
+  const q = document.getElementById('gpSearchInput').value.toLowerCase();
+  document.querySelectorAll('.gp-pick-item').forEach(function(item) {
+    item.style.display = item.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+function updateGPPickCount() {
+  const n = document.querySelectorAll('.gp-handpick-check:checked').length;
+  document.getElementById('gpPickCount').textContent = n;
+  const badge = document.getElementById('gpPickBadge');
+  badge.textContent = n + ' selected';
+  badge.style.setProperty('display', n > 0 ? 'inline-block' : 'none', 'important');
+}
+function clearGPPicks() {
+  document.querySelectorAll('.gp-handpick-check').forEach(function(cb) { cb.checked = false; });
+  updateGPPickCount();
+}
+
+// ── Hand-pick: LP ──
+function filterLPList() {
+  const q = document.getElementById('lpSearchInput').value.toLowerCase();
+  document.querySelectorAll('.lp-pick-item').forEach(function(item) {
+    item.style.display = item.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+function updateLPPickCount() {
+  const n = document.querySelectorAll('.lp-handpick-check:checked').length;
+  document.getElementById('lpPickCount').textContent = n;
+  const badge = document.getElementById('lpPickBadge');
+  badge.textContent = n + ' selected';
+  badge.style.setProperty('display', n > 0 ? 'inline-block' : 'none', 'important');
+}
+function clearLPPicks() {
+  document.querySelectorAll('.lp-handpick-check').forEach(function(cb) { cb.checked = false; });
+  updateLPPickCount();
+}
 </script>
 {% endblock %}

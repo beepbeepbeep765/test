@@ -1711,6 +1711,12 @@ def new_campaign():
     lp_batches = conn.execute(
         "SELECT * FROM import_batches WHERE type='lp' ORDER BY created_at DESC"
     ).fetchall()
+    all_lp_investors = conn.execute(
+        "SELECT id, name, company, email FROM lp_investors ORDER BY name"
+    ).fetchall()
+    all_gp_contacts = conn.execute(
+        "SELECT id, name, company, email FROM gp_contacts ORDER BY name"
+    ).fetchall()
 
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -1720,32 +1726,43 @@ def new_campaign():
 
         status_filter = request.form.getlist("status_filter")
         selected_batch_ids = request.form.getlist("batch_ids")
+        lp_handpick_ids = request.form.getlist("lp_handpick_ids")
+        gp_handpick_ids = request.form.getlist("gp_handpick_ids")
 
         if target_audience == "lp":
-            # Filter LP investors
-            sql = "SELECT * FROM lp_investors WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
-            params = []
-            if status_filter:
-                placeholders = ",".join("?" * len(status_filter))
-                sql += f" AND status IN ({placeholders})"
-                params += status_filter
-            asset_type_kw = request.form.get("asset_type_kw", "").strip()
-            if asset_type_kw:
-                sql += " AND preferred_asset_types LIKE ?"
-                params.append(f"%{asset_type_kw}%")
-            if selected_batch_ids:
-                placeholders = ",".join("?" * len(selected_batch_ids))
-                sql += f" AND import_batch_id IN ({placeholders})"
-                params += selected_batch_ids
-            sql += " ORDER BY name"
-
-            recipients = conn.execute(sql, params).fetchall()
+            if lp_handpick_ids:
+                # Hand-picked individuals override filters
+                placeholders = ",".join("?" * len(lp_handpick_ids))
+                recipients = conn.execute(
+                    f"SELECT * FROM lp_investors WHERE id IN ({placeholders}) ORDER BY name",
+                    lp_handpick_ids,
+                ).fetchall()
+            else:
+                # Filter LP investors
+                sql = "SELECT * FROM lp_investors WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+                params = []
+                if status_filter:
+                    placeholders = ",".join("?" * len(status_filter))
+                    sql += f" AND status IN ({placeholders})"
+                    params += status_filter
+                asset_type_kw = request.form.get("asset_type_kw", "").strip()
+                if asset_type_kw:
+                    sql += " AND preferred_asset_types LIKE ?"
+                    params.append(f"%{asset_type_kw}%")
+                if selected_batch_ids:
+                    placeholders = ",".join("?" * len(selected_batch_ids))
+                    sql += f" AND import_batch_id IN ({placeholders})"
+                    params += selected_batch_ids
+                sql += " ORDER BY name"
+                recipients = conn.execute(sql, params).fetchall()
 
             if not recipients:
                 conn.close()
                 flash("No LP investors match those filters (or none have email addresses). Adjust filters and try again.", "warning")
                 return render_template("campaign_new.html", templates=templates_list,
-                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
+                                       gp_batches=gp_batches, lp_batches=lp_batches,
+                                       all_lp_investors=all_lp_investors,
+                                       all_gp_contacts=all_gp_contacts, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1764,30 +1781,39 @@ def new_campaign():
                 )
 
         else:
-            # Filter GPs
-            sql = "SELECT * FROM gp_contacts WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
-            params = []
-            if status_filter:
-                placeholders = ",".join("?" * len(status_filter))
-                sql += f" AND status IN ({placeholders})"
-                params += status_filter
-            strategy_kw = request.form.get("strategy_kw", "").strip()
-            if strategy_kw:
-                sql += " AND strategy LIKE ?"
-                params.append(f"%{strategy_kw}%")
-            if selected_batch_ids:
-                placeholders = ",".join("?" * len(selected_batch_ids))
-                sql += f" AND import_batch_id IN ({placeholders})"
-                params += selected_batch_ids
-            sql += " ORDER BY name"
-
-            recipients = conn.execute(sql, params).fetchall()
+            if gp_handpick_ids:
+                # Hand-picked individuals override filters
+                placeholders = ",".join("?" * len(gp_handpick_ids))
+                recipients = conn.execute(
+                    f"SELECT * FROM gp_contacts WHERE id IN ({placeholders}) ORDER BY name",
+                    gp_handpick_ids,
+                ).fetchall()
+            else:
+                # Filter GPs
+                sql = "SELECT * FROM gp_contacts WHERE email IS NOT NULL AND email != '' AND email LIKE '%@%'"
+                params = []
+                if status_filter:
+                    placeholders = ",".join("?" * len(status_filter))
+                    sql += f" AND status IN ({placeholders})"
+                    params += status_filter
+                strategy_kw = request.form.get("strategy_kw", "").strip()
+                if strategy_kw:
+                    sql += " AND strategy LIKE ?"
+                    params.append(f"%{strategy_kw}%")
+                if selected_batch_ids:
+                    placeholders = ",".join("?" * len(selected_batch_ids))
+                    sql += f" AND import_batch_id IN ({placeholders})"
+                    params += selected_batch_ids
+                sql += " ORDER BY name"
+                recipients = conn.execute(sql, params).fetchall()
 
             if not recipients:
                 conn.close()
                 flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
                 return render_template("campaign_new.html", templates=templates_list,
-                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
+                                       gp_batches=gp_batches, lp_batches=lp_batches,
+                                       all_lp_investors=all_lp_investors,
+                                       all_gp_contacts=all_gp_contacts, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1812,7 +1838,10 @@ def new_campaign():
 
     conn.close()
     return render_template("campaign_new.html", templates=templates_list,
-                           gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
+                           gp_batches=gp_batches, lp_batches=lp_batches,
+                           all_lp_investors=all_lp_investors,
+                           all_gp_contacts=all_gp_contacts,
+                           title="New Campaign")
 
 
 @app.route("/campaigns/<int:campaign_id>/review")
