@@ -82,7 +82,7 @@
             </div>
             <div class="text-muted small text-truncate">{{ e.company or '' }}</div>
             <div class="text-muted small text-truncate opacity-75" style="font-size:.75rem;">
-              {{ e.body[:90] | replace('\n', ' ') }}…
+              {{ e.body | striptags | truncate(90, True, '…') }}
             </div>
           </div>
         </div>
@@ -118,7 +118,7 @@
               <div class="col-10 fw-semibold" id="pv-subject">{{ first.subject }}</div>
             </div>
           </div>
-          <pre id="pv-body" style="white-space:pre-wrap;font-family:inherit;font-size:.9rem;line-height:1.65;">{{ first.body }}</pre>
+          <div id="pv-body" style="font-size:.9rem;line-height:1.65;">{{ first.body | safe }}</div>
         </div>
         {% else %}
         <p class="text-muted mt-4 text-center">No emails in this campaign.</p>
@@ -177,7 +177,7 @@ document.querySelectorAll('.email-row').forEach(function(row) {
     document.getElementById('pv-company').textContent = d.company;
     document.getElementById('pv-company-row').style.display = d.company ? '' : 'none';
     document.getElementById('pv-subject').textContent = d.subject;
-    document.getElementById('pv-body').textContent = d.body;
+    document.getElementById('pv-body').innerHTML = d.body;
 
     document.querySelectorAll('.email-row').forEach(function(r) { r.classList.remove('active'); });
     this.classList.add('active');
