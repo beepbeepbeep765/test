@@ -1688,6 +1688,17 @@ def _apply_merge_lp(text, investor):
             .replace("{markets}", markets))
 
 
+import re
+
+def _email_ready_html(html):
+    """Make Quill HTML email-friendly by removing paragraph spacing."""
+    if not html:
+        return html
+    # Add margin:0 to <p> tags so email clients don't add extra spacing
+    html = re.sub(r'<p(?=[\s>])', '<p style="margin:0;padding:0;"', html)
+    return html
+
+
 @app.route("/campaigns")
 def campaigns():
     conn = get_db()
@@ -1763,7 +1774,7 @@ def new_campaign():
 
             for inv in recipients:
                 rendered_subject = _apply_merge_lp(subject, inv)
-                rendered_body = _apply_merge_lp(body, inv)
+                rendered_body = _email_ready_html(_apply_merge_lp(body, inv))
                 conn.execute(
                     "INSERT INTO campaign_emails (campaign_id, lp_investor_id, to_name, to_email, company, subject, body) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -1812,7 +1823,7 @@ def new_campaign():
 
             for gp in recipients:
                 rendered_subject = _apply_merge(subject, gp)
-                rendered_body = _apply_merge(body, gp)
+                rendered_body = _email_ready_html(_apply_merge(body, gp))
                 conn.execute(
                     "INSERT INTO campaign_emails (campaign_id, contact_id, to_name, to_email, company, subject, body) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
