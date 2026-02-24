@@ -138,7 +138,7 @@
         </thead>
         <tbody>
           {% for o in outreaches %}
-          <tr {% if o.follow_up_needed %}class="table-warning"{% endif %}>
+          <tr {% if o.follow_up_needed %}class="table-warning"{% endif %} id="row-{{ o.id }}">
             <td>
               <div class="fw-semibold">{{ o.contact_name }}</div>
               {% if o.company %}<div class="text-muted small">{{ o.company }}</div>{% endif %}
@@ -159,7 +159,7 @@
               <span class="text-truncate-cell small" title="{{ o.response_summary }}">{{ o.response_summary }}</span>
               {% elif o.response_date %}
               <span class="text-muted small">{{ o.response_date }}</span>
-              {% else %}—{% endif %}
+              {% else %}<span class="text-muted small">—</span>{% endif %}
             </td>
             <td class="text-center">
               {% if o.follow_up_needed %}
@@ -168,10 +168,69 @@
               {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td>
-              <div class="d-flex gap-1">
+              <div class="d-flex gap-1 flex-wrap">
+                <button type="button" class="btn btn-sm btn-success"
+                        onclick="toggleResponse({{ o.id }})">
+                  <i class="bi bi-reply me-1"></i>Response
+                </button>
                 <a href="{{ url_for('edit_outreach', deal_id=deal.id, outreach_id=o.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                 <form method="POST" action="{{ url_for('delete_outreach', deal_id=deal.id, outreach_id=o.id) }}" onsubmit="return confirm('Delete this entry?')">
                   <button class="btn btn-sm btn-outline-danger">Del</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <!-- Inline response form -->
+          <tr id="resp-{{ o.id }}" style="display:none;">
+            <td colspan="9" class="p-0">
+              <div class="p-3 bg-light border-top border-bottom">
+                <form method="POST" action="{{ url_for('log_outreach_response', deal_id=deal.id, outreach_id=o.id) }}">
+                  <div class="fw-semibold small mb-2 text-primary">
+                    <i class="bi bi-reply me-1"></i>Log response from {{ o.contact_name }}{% if o.company %} · {{ o.company }}{% endif %}
+                  </div>
+                  <div class="row g-2 align-items-end">
+                    <div class="col-sm-2">
+                      <label class="form-label fw-semibold small mb-1">Response Date</label>
+                      <input type="date" name="response_date" class="form-control form-control-sm"
+                             value="{{ o.response_date or '' }}" />
+                    </div>
+                    <div class="col-sm-2">
+                      <label class="form-label fw-semibold small mb-1">Interest Level</label>
+                      <select name="interest_level" class="form-select form-select-sm">
+                        {% for lvl in ['Unknown','Hot','Warm','Interested','Passed'] %}
+                        <option value="{{ lvl }}" {% if (o.interest_level or 'Unknown') == lvl %}selected{% endif %}>{{ lvl }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-sm-2">
+                      <label class="form-label fw-semibold small mb-1">Stage</label>
+                      <select name="stage" class="form-select form-select-sm">
+                        {% for s in ['Initial Email','Follow-Up','Call/Meeting','LOI','Under Contract','Closed/Won','Passed'] %}
+                        <option value="{{ s }}" {% if (o.stage or 'Initial Email') == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col">
+                      <label class="form-label fw-semibold small mb-1">What they said</label>
+                      <input type="text" name="response_summary" class="form-control form-control-sm"
+                             value="{{ o.response_summary or '' }}"
+                             placeholder="e.g. Interested, wants deck. Passing — too small." />
+                    </div>
+                    <div class="col-auto">
+                      <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" name="follow_up_needed"
+                               id="fu_{{ o.id }}" {% if o.follow_up_needed %}checked{% endif %} />
+                        <label class="form-check-label small" for="fu_{{ o.id }}">Follow-up needed</label>
+                      </div>
+                      <input type="date" name="follow_up_date" class="form-control form-control-sm"
+                             value="{{ o.follow_up_date or '' }}" placeholder="Follow-up by" />
+                    </div>
+                    <div class="col-auto">
+                      <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+                              onclick="toggleResponse({{ o.id }})">Cancel</button>
+                    </div>
+                  </div>
                 </form>
               </div>
             </td>
@@ -238,5 +297,12 @@
   <i class="bi bi-info-circle me-2"></i>No GP matches found yet. Add GP contacts with check sizes and strategies to see investor matches here.
 </div>
 {% endif %}
+
+<script>
+function toggleResponse(id) {
+  var row = document.getElementById('resp-' + id);
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
 
 {% endblock %}

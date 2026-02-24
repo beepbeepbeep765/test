@@ -653,6 +653,25 @@ def delete_outreach(deal_id, outreach_id):
     return redirect(url_for("deal_detail", deal_id=deal_id))
 
 
+@app.route("/deals/<int:deal_id>/outreach/<int:outreach_id>/log-response", methods=["POST"])
+def log_outreach_response(deal_id, outreach_id):
+    conn = get_db()
+    conn.execute(
+        "UPDATE outreach SET response_date=?, response_summary=?, interest_level=?, "
+        "follow_up_needed=?, follow_up_date=?, stage=? WHERE id=? AND deal_id=?",
+        (request.form.get("response_date") or None,
+         request.form.get("response_summary", "").strip(),
+         request.form.get("interest_level", "Unknown"),
+         1 if request.form.get("follow_up_needed") else 0,
+         request.form.get("follow_up_date") or None,
+         request.form.get("stage", "Initial Email"),
+         outreach_id, deal_id),
+    )
+    conn.commit(); conn.close()
+    flash("Response logged.", "success")
+    return redirect(url_for("deal_detail", deal_id=deal_id))
+
+
 @app.route("/outreach/from-email", methods=["POST"])
 def outreach_from_email():
     """One-click: log an outreach entry directly from an email."""
