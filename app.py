@@ -1711,13 +1711,6 @@ def new_campaign():
     lp_batches = conn.execute(
         "SELECT * FROM import_batches WHERE type='lp' ORDER BY created_at DESC"
     ).fetchall()
-    all_lp_investors = conn.execute(
-        "SELECT id, name, company, email FROM lp_investors ORDER BY name"
-    ).fetchall()
-    all_gp_contacts = conn.execute(
-        "SELECT id, name, company, email FROM gp_contacts ORDER BY name"
-    ).fetchall()
-
     if request.method == "POST":
         name = request.form["name"].strip()
         subject = request.form["subject"].strip()
@@ -1760,9 +1753,7 @@ def new_campaign():
                 conn.close()
                 flash("No LP investors match those filters (or none have email addresses). Adjust filters and try again.", "warning")
                 return render_template("campaign_new.html", templates=templates_list,
-                                       gp_batches=gp_batches, lp_batches=lp_batches,
-                                       all_lp_investors=all_lp_investors,
-                                       all_gp_contacts=all_gp_contacts, title="New Campaign")
+                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1811,9 +1802,7 @@ def new_campaign():
                 conn.close()
                 flash("No GP contacts match those filters (or none have email addresses). Adjust filters and try again.", "warning")
                 return render_template("campaign_new.html", templates=templates_list,
-                                       gp_batches=gp_batches, lp_batches=lp_batches,
-                                       all_lp_investors=all_lp_investors,
-                                       all_gp_contacts=all_gp_contacts, title="New Campaign")
+                                       gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
             cur = conn.execute(
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
@@ -1838,10 +1827,32 @@ def new_campaign():
 
     conn.close()
     return render_template("campaign_new.html", templates=templates_list,
-                           gp_batches=gp_batches, lp_batches=lp_batches,
-                           all_lp_investors=all_lp_investors,
-                           all_gp_contacts=all_gp_contacts,
-                           title="New Campaign")
+                           gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
+
+
+@app.route("/campaigns/contacts-search")
+def campaigns_contacts_search():
+    """AJAX: search GP contacts or LP investors for hand-pick selection."""
+    q = request.args.get("q", "").strip()
+    audience = request.args.get("audience", "gp")
+    like = f"%{q}%"
+    conn = get_db()
+    if audience == "lp":
+        rows = conn.execute(
+            "SELECT id, name, company, email FROM lp_investors "
+            "WHERE (name LIKE ? OR company LIKE ? OR email LIKE ?) "
+            "ORDER BY name LIMIT 60",
+            (like, like, like),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, name, company, email FROM gp_contacts "
+            "WHERE (name LIKE ? OR company LIKE ? OR email LIKE ?) "
+            "ORDER BY name LIMIT 60",
+            (like, like, like),
+        ).fetchall()
+    conn.close()
+    return {"results": [dict(r) for r in rows]}
 
 
 @app.route("/campaigns/<int:campaign_id>/review")

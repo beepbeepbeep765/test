@@ -82,22 +82,10 @@
           <input type="text" id="gpSearchInput" class="form-control form-control-sm mb-2"
                  placeholder="Search name, firm, email…" oninput="filterGPList()">
           <div id="gpContactList" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:6px;">
-            {% for gp in all_gp_contacts %}
-            <div class="gp-pick-item d-flex align-items-center py-1 px-1"
-                 data-search="{{ ((gp.name or '') + ' ' + (gp.company or '') + ' ' + (gp.email or '')) | lower }}">
-              <input type="checkbox" class="form-check-input me-2 flex-shrink-0 gp-handpick-check"
-                     name="gp_handpick_ids" value="{{ gp.id }}" id="gp_pick_{{ gp.id }}"
-                     onchange="updateGPPickCount()">
-              <label class="form-check-label small w-100" for="gp_pick_{{ gp.id }}" style="cursor:pointer;">
-                <span class="fw-semibold">{{ gp.name }}</span>
-                {% if gp.company %}<span class="text-muted"> · {{ gp.company }}</span>{% endif %}
-                {% if gp.email %}<span class="text-muted" style="font-size:.75rem;"> · {{ gp.email }}</span>{% endif %}
-              </label>
-            </div>
-            {% else %}
-            <p class="text-muted small mb-0 p-2">No GP contacts found.</p>
-            {% endfor %}
+            <p class="text-muted small mb-0 p-2" id="gpPickPlaceholder">Type above to search GP contacts.</p>
           </div>
+          <!-- Hidden inputs for hand-picked GP IDs (managed by JS) -->
+          <div id="gpHandpickInputs"></div>
           <div class="form-text mt-1 d-flex align-items-center gap-2">
             <span id="gpPickCount">0</span> selected
             <button type="button" class="btn btn-link btn-sm py-0 px-0" onclick="clearGPPicks()">Clear all</button>
@@ -173,22 +161,10 @@
           <input type="text" id="lpSearchInput" class="form-control form-control-sm mb-2"
                  placeholder="Search name, firm, email…" oninput="filterLPList()">
           <div id="lpContactList" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:6px;">
-            {% for inv in all_lp_investors %}
-            <div class="lp-pick-item d-flex align-items-center py-1 px-1"
-                 data-search="{{ ((inv.name or '') + ' ' + (inv.company or '') + ' ' + (inv.email or '')) | lower }}">
-              <input type="checkbox" class="form-check-input me-2 flex-shrink-0 lp-handpick-check"
-                     name="lp_handpick_ids" value="{{ inv.id }}" id="lp_pick_{{ inv.id }}"
-                     onchange="updateLPPickCount()">
-              <label class="form-check-label small w-100" for="lp_pick_{{ inv.id }}" style="cursor:pointer;">
-                <span class="fw-semibold">{{ inv.name }}</span>
-                {% if inv.company %}<span class="text-muted"> · {{ inv.company }}</span>{% endif %}
-                {% if inv.email %}<span class="text-muted" style="font-size:.75rem;"> · {{ inv.email }}</span>{% endif %}
-              </label>
-            </div>
-            {% else %}
-            <p class="text-muted small mb-0 p-2">No LP investors found.</p>
-            {% endfor %}
+            <p class="text-muted small mb-0 p-2" id="lpPickPlaceholder">Type above to search LP investors.</p>
           </div>
+          <!-- Hidden inputs for hand-picked LP IDs (managed by JS) -->
+          <div id="lpHandpickInputs"></div>
           <div class="form-text mt-1 d-flex align-items-center gap-2">
             <span id="lpPickCount">0</span> selected
             <button type="button" class="btn btn-link btn-sm py-0 px-0" onclick="clearLPPicks()">Clear all</button>
@@ -409,42 +385,126 @@ function insertMerge(btn, field) {
 // Init: disable LP checkboxes on load (GP is default)
 document.querySelectorAll('.lp-status-check').forEach(function(cb) { cb.disabled = true; });
 
-// ── Hand-pick: GP ──
-function filterGPList() {
-  const q = document.getElementById('gpSearchInput').value.toLowerCase();
-  document.querySelectorAll('.gp-pick-item').forEach(function(item) {
-    item.style.display = item.dataset.search.includes(q) ? '' : 'none';
+// ── Hand-pick (AJAX) ──
+var selectedGP = {};  // id -> {name, company, email}
+var selectedLP = {};
+var gpSearchTimer, lpSearchTimer;
+
+function renderPickList(containerId, placeholderId, inputsId, results, selected, namePrefix, onToggle) {
+  var list = document.getElementById(containerId);
+  var ph = document.getElementById(placeholderId);
+  if (!results.length) {
+    list.innerHTML = '';
+    ph = document.createElement('p');
+    ph.className = 'text-muted small mb-0 p-2';
+    ph.textContent = 'No results found.';
+    list.appendChild(ph);
+    return;
+  }
+  list.innerHTML = '';
+  results.forEach(function(r) {
+    var checked = !!selected[r.id];
+    var div = document.createElement('div');
+    div.className = 'd-flex align-items-center py-1 px-1';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'form-check-input me-2 flex-shrink-0';
+    cb.id = namePrefix + r.id;
+    cb.checked = checked;
+    cb.onchange = function() { onToggle(r, this.checked); };
+    var lbl = document.createElement('label');
+    lbl.htmlFor = cb.id;
+    lbl.className = 'form-check-label small w-100';
+    lbl.style.cursor = 'pointer';
+    lbl.innerHTML = '<span class="fw-semibold">' + (r.name || '') + '</span>' +
+      (r.company ? '<span class="text-muted"> · ' + r.company + '</span>' : '') +
+      (r.email ? '<span class="text-muted" style="font-size:.75rem;"> · ' + r.email + '</span>' : '');
+    div.appendChild(cb); div.appendChild(lbl);
+    list.appendChild(div);
   });
-}
-function updateGPPickCount() {
-  const n = document.querySelectorAll('.gp-handpick-check:checked').length;
-  document.getElementById('gpPickCount').textContent = n;
-  const badge = document.getElementById('gpPickBadge');
-  badge.textContent = n + ' selected';
-  badge.style.setProperty('display', n > 0 ? 'inline-block' : 'none', 'important');
-}
-function clearGPPicks() {
-  document.querySelectorAll('.gp-handpick-check').forEach(function(cb) { cb.checked = false; });
-  updateGPPickCount();
 }
 
-// ── Hand-pick: LP ──
-function filterLPList() {
-  const q = document.getElementById('lpSearchInput').value.toLowerCase();
-  document.querySelectorAll('.lp-pick-item').forEach(function(item) {
-    item.style.display = item.dataset.search.includes(q) ? '' : 'none';
+function refreshHiddenInputs(containerId, fieldName, selected) {
+  var c = document.getElementById(containerId);
+  c.innerHTML = '';
+  Object.keys(selected).forEach(function(id) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = fieldName; inp.value = id;
+    c.appendChild(inp);
   });
 }
-function updateLPPickCount() {
-  const n = document.querySelectorAll('.lp-handpick-check:checked').length;
-  document.getElementById('lpPickCount').textContent = n;
-  const badge = document.getElementById('lpPickBadge');
+
+function updatePickBadge(countId, badgeId, n) {
+  document.getElementById(countId).textContent = n;
+  var badge = document.getElementById(badgeId);
   badge.textContent = n + ' selected';
   badge.style.setProperty('display', n > 0 ? 'inline-block' : 'none', 'important');
 }
+
+// GP
+function filterGPList() {
+  clearTimeout(gpSearchTimer);
+  gpSearchTimer = setTimeout(function() {
+    var q = document.getElementById('gpSearchInput').value.trim();
+    if (!q) {
+      document.getElementById('gpContactList').innerHTML =
+        '<p class="text-muted small mb-0 p-2">Type above to search GP contacts.</p>';
+      return;
+    }
+    fetch('/campaigns/contacts-search?audience=gp&q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderPickList('gpContactList', 'gpPickPlaceholder', 'gpHandpickInputs',
+          data.results, selectedGP, 'gp_pick_',
+          function(r, checked) {
+            if (checked) { selectedGP[r.id] = r; } else { delete selectedGP[r.id]; }
+            refreshHiddenInputs('gpHandpickInputs', 'gp_handpick_ids', selectedGP);
+            updatePickBadge('gpPickCount', 'gpPickBadge', Object.keys(selectedGP).length);
+          });
+      });
+  }, 250);
+}
+function updateGPPickCount() {}  // kept for compat
+function clearGPPicks() {
+  selectedGP = {};
+  refreshHiddenInputs('gpHandpickInputs', 'gp_handpick_ids', selectedGP);
+  updatePickBadge('gpPickCount', 'gpPickBadge', 0);
+  document.getElementById('gpSearchInput').value = '';
+  document.getElementById('gpContactList').innerHTML =
+    '<p class="text-muted small mb-0 p-2">Type above to search GP contacts.</p>';
+}
+
+// LP
+function filterLPList() {
+  clearTimeout(lpSearchTimer);
+  lpSearchTimer = setTimeout(function() {
+    var q = document.getElementById('lpSearchInput').value.trim();
+    if (!q) {
+      document.getElementById('lpContactList').innerHTML =
+        '<p class="text-muted small mb-0 p-2">Type above to search LP investors.</p>';
+      return;
+    }
+    fetch('/campaigns/contacts-search?audience=lp&q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderPickList('lpContactList', 'lpPickPlaceholder', 'lpHandpickInputs',
+          data.results, selectedLP, 'lp_pick_',
+          function(r, checked) {
+            if (checked) { selectedLP[r.id] = r; } else { delete selectedLP[r.id]; }
+            refreshHiddenInputs('lpHandpickInputs', 'lp_handpick_ids', selectedLP);
+            updatePickBadge('lpPickCount', 'lpPickBadge', Object.keys(selectedLP).length);
+          });
+      });
+  }, 250);
+}
+function updateLPPickCount() {}  // kept for compat
 function clearLPPicks() {
-  document.querySelectorAll('.lp-handpick-check').forEach(function(cb) { cb.checked = false; });
-  updateLPPickCount();
+  selectedLP = {};
+  refreshHiddenInputs('lpHandpickInputs', 'lp_handpick_ids', selectedLP);
+  updatePickBadge('lpPickCount', 'lpPickBadge', 0);
+  document.getElementById('lpSearchInput').value = '';
+  document.getElementById('lpContactList').innerHTML =
+    '<p class="text-muted small mb-0 p-2">Type above to search LP investors.</p>';
 }
 </script>
 {% endblock %}
