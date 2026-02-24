@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Import LP Investors — ACRE CRM{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="bi bi-cloud-upload me-2 text-primary"></i>Import LP Investors</h4>
+    <p class="text-muted small mb-0">Upload an Excel or CSV file — investors are added to your LP database.</p>
+  </div>
+  <a href="{{ url_for('lp_investors') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to LP Investors
+  </a>
+</div>
+
+{% if not preview %}
+<!-- Upload form -->
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data">
+          <div class="mb-4">
+            <label class="form-label fw-semibold">LP Investor File <span class="text-danger">*</span></label>
+            <input type="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required />
+            <div class="form-text">Accepts <strong>.csv</strong> or <strong>.xlsx</strong> files.</div>
+          </div>
+
+          <div class="alert alert-info border-0 small py-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Columns are auto-detected. After uploading you'll see a preview before anything is saved.
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 fw-semibold">
+            <i class="bi bi-upload me-2"></i>Upload & Preview
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+      <div class="card-header bg-transparent border-0 pb-0">
+        <span class="fw-semibold small text-muted text-uppercase">Supported Column Names</span>
+      </div>
+      <div class="card-body pt-2">
+        <div class="row g-2 small text-muted">
+          <div class="col-6">
+            <strong class="text-dark d-block">Name</strong>
+            Contact Name, Name, Investor Name
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Company / Firm</strong>
+            Firm, Company, Organization
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Email</strong>
+            Email, Email Address, Primary Email
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Net Worth / AUM</strong>
+            Net Worth, AUM, Total AUM
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Asset Types</strong>
+            Asset Type, Asset Class, Strategy
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Markets</strong>
+            Markets, Preferred Markets, Geography
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Check Size</strong>
+            Min Check, Max Check, Min Investment
+          </div>
+          <div class="col-6">
+            <strong class="text-dark d-block">Location</strong>
+            City, Location, Country, State
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- Preview + confirm -->
+<div class="alert alert-success border-0 d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-check-circle-fill fs-5"></i>
+  <div>
+    Found <strong>{{ row_count }} investors</strong> ready to import.
+    Review the sample below, then click <strong>Confirm Import</strong> to add them all to your LP database.
+  </div>
+</div>
+
+<!-- Column mapping summary -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 pb-0">
+    <span class="fw-semibold small text-muted text-uppercase">Detected Column Mapping</span>
+  </div>
+  <div class="card-body pt-2">
+    <div class="row g-2 small">
+      {% for field, col in col_map.items() %}
+      {% if col %}
+      <div class="col-md-3 col-6">
+        <span class="text-muted">{{ field.replace('_', ' ').title() }}:</span>
+        <span class="fw-semibold">{{ col }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Preview table -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-2">
+    <span class="fw-semibold">Preview (first 20 of {{ row_count }} rows)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Email</th>
+          <th>Location</th>
+          <th>Net Worth / AUM</th>
+          <th>Asset Types</th>
+          <th>Check Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in preview[:20] %}
+        <tr>
+          <td class="fw-semibold">{{ inv.name or '—' }}</td>
+          <td>{{ inv.company or '—' }}</td>
+          <td class="text-muted small">{{ inv.title or '' }}</td>
+          <td class="small">{{ inv.email or '—' }}</td>
+          <td class="small text-muted">{{ inv.location or '' }}</td>
+          <td class="small text-muted">{{ inv.net_worth or '' }}</td>
+          <td class="small text-muted">{{ inv.preferred_asset_types or '' }}</td>
+          <td class="small text-muted">
+            {% if inv.min_check or inv.max_check %}
+              {{ inv.min_check or '' }}{% if inv.min_check and inv.max_check %}–{% endif %}{{ inv.max_check or '' }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if row_count > 20 %}
+        <tr>
+          <td colspan="8" class="text-muted small text-center py-2">
+            … and {{ row_count - 20 }} more
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Confirm form -->
+<div class="d-flex gap-3">
+  <a href="{{ url_for('import_lp_investors') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Upload a different file
+  </a>
+  <form method="POST" action="{{ url_for('import_lp_investors_confirm') }}" class="d-inline">
+    {% for inv in preview %}
+    <input type="hidden" name="rows[{{ loop.index0 }}][name]" value="{{ inv.name }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][company]" value="{{ inv.company }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][title]" value="{{ inv.title }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][email]" value="{{ inv.email }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][phone]" value="{{ inv.phone }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][location]" value="{{ inv.location }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][net_worth]" value="{{ inv.net_worth }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][preferred_asset_types]" value="{{ inv.preferred_asset_types }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][preferred_markets]" value="{{ inv.preferred_markets }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][min_check]" value="{{ inv.min_check }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][max_check]" value="{{ inv.max_check }}" />
+    <input type="hidden" name="rows[{{ loop.index0 }}][notes]" value="{{ inv.notes }}" />
+    {% endfor %}
+    <button type="submit" class="btn btn-success fw-semibold px-4">
+      <i class="bi bi-check2-circle me-2"></i>Confirm — Import {{ row_count }} investors
+    </button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

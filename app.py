@@ -2060,6 +2060,140 @@ def import_contacts_confirm():
     return redirect(url_for("contacts"))
 
 
+# ── LP Investor Excel / CSV Import ────────────────────────────────────────────
+
+_LP_COL_MAP = {
+    "name":                  ["contact name", "name", "full name", "investor name", "first name"],
+    "company":               ["firm", "company", "organization", "fund manager", "employer"],
+    "title":                 ["title", "job title", "position", "role"],
+    "email":                 ["email", "email address", "e-mail", "primary email"],
+    "phone":                 ["phone", "phone number", "telephone", "mobile"],
+    "location":              ["city", "location", "country", "state", "hq location", "geography"],
+    "net_worth":             ["net worth", "aum", "total aum", "assets under management",
+                              "estimated net worth", "wealth"],
+    "preferred_asset_types": ["asset type", "asset class", "preferred asset types",
+                              "investment type", "focus", "strategy", "investment strategy"],
+    "preferred_markets":     ["markets", "preferred markets", "geography", "target markets",
+                              "market focus", "regions"],
+    "min_check":             ["min check", "minimum check", "min investment",
+                              "minimum investment", "min equity"],
+    "max_check":             ["max check", "maximum check", "max investment",
+                              "maximum investment", "max equity"],
+    "notes":                 ["notes", "comments", "description"],
+}
+
+
+@app.route("/lp-investors/import", methods=["GET", "POST"])
+def import_lp_investors():
+    if request.method == "GET":
+        return render_template("lp_investors_import.html")
+
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename:
+        flash("Please select a file to upload.", "warning")
+        return render_template("lp_investors_import.html")
+
+    fname = uploaded.filename.lower()
+    rows = []
+    headers = []
+
+    try:
+        if fname.endswith(".csv"):
+            import io as _io
+            content = uploaded.read().decode("utf-8-sig", errors="replace")
+            reader = csv.DictReader(_io.StringIO(content))
+            headers = reader.fieldnames or []
+            rows = list(reader)
+        elif fname.endswith((".xlsx", ".xls")):
+            import openpyxl
+            wb = openpyxl.load_workbook(uploaded, read_only=True, data_only=True)
+            ws = wb.active
+            all_rows = list(ws.iter_rows(values_only=True))
+            if not all_rows:
+                flash("The uploaded file appears to be empty.", "warning")
+                return render_template("lp_investors_import.html")
+            headers = [str(h).strip() if h is not None else "" for h in all_rows[0]]
+            for r in all_rows[1:]:
+                rows.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in r])))
+        else:
+            flash("Please upload a .csv or .xlsx file.", "warning")
+            return render_template("lp_investors_import.html")
+    except Exception as e:
+        flash(f"Could not read file: {e}", "danger")
+        return render_template("lp_investors_import.html")
+
+    col_map = {field: _detect_col(headers, candidates) for field, candidates in _LP_COL_MAP.items()}
+
+    preview = []
+    for r in rows:
+        def g(field, _r=r):
+            col = col_map.get(field)
+            return (_r.get(col) or "").strip() if col else ""
+
+        entry = {
+            "name": g("name"), "company": g("company"), "title": g("title"),
+            "email": g("email"), "phone": g("phone"), "location": g("location"),
+            "net_worth": g("net_worth"), "preferred_asset_types": g("preferred_asset_types"),
+            "preferred_markets": g("preferred_markets"), "min_check": g("min_check"),
+            "max_check": g("max_check"), "notes": g("notes"),
+        }
+        if entry["name"] or entry["company"] or entry["email"]:
+            preview.append(entry)
+
+    if not preview:
+        flash("No usable rows found. Make sure the file has a name, company, or email column.", "warning")
+        return render_template("lp_investors_import.html")
+
+    return render_template("lp_investors_import.html", preview=preview, col_map=col_map, row_count=len(preview))
+
+
+@app.route("/lp-investors/import/confirm", methods=["POST"])
+def import_lp_investors_confirm():
+    i = 0
+    entries = []
+    while request.form.get(f"rows[{i}][name]") is not None or request.form.get(f"rows[{i}][email]") is not None:
+        entries.append({
+            "name":                  request.form.get(f"rows[{i}][name]", "").strip(),
+            "company":               request.form.get(f"rows[{i}][company]", "").strip(),
+            "title":                 request.form.get(f"rows[{i}][title]", "").strip(),
+            "email":                 request.form.get(f"rows[{i}][email]", "").strip(),
+            "phone":                 request.form.get(f"rows[{i}][phone]", "").strip(),
+            "location":              request.form.get(f"rows[{i}][location]", "").strip(),
+            "net_worth":             request.form.get(f"rows[{i}][net_worth]", "").strip(),
+            "preferred_asset_types": request.form.get(f"rows[{i}][preferred_asset_types]", "").strip(),
+            "preferred_markets":     request.form.get(f"rows[{i}][preferred_markets]", "").strip(),
+            "min_check":             request.form.get(f"rows[{i}][min_check]", "").strip(),
+            "max_check":             request.form.get(f"rows[{i}][max_check]", "").strip(),
+            "notes":                 request.form.get(f"rows[{i}][notes]", "").strip(),
+        })
+        i += 1
+
+    if not entries:
+        flash("No data received. Please re-upload your file.", "warning")
+        return redirect(url_for("import_lp_investors"))
+
+    conn = get_db()
+    imported = 0
+    for entry in entries:
+        if not entry["name"] and not entry["email"]:
+            continue
+        name = entry["name"] or entry["company"] or "Unknown"
+        conn.execute(
+            "INSERT INTO lp_investors (name, title, company, email, phone, location, "
+            "net_worth, preferred_asset_types, preferred_markets, min_check, max_check, "
+            "source, status, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Excel Import', 'New', ?)",
+            (name, entry["title"], entry["company"], entry["email"], entry["phone"],
+             entry["location"], entry["net_worth"], entry["preferred_asset_types"],
+             entry["preferred_markets"], entry["min_check"], entry["max_check"],
+             entry["notes"]),
+        )
+        imported += 1
+    conn.commit(); conn.close()
+    flash(f"Imported {imported} LP investors.", "success")
+    return redirect(url_for("lp_investors"))
+
+
 # ── GP Contacts CSV Export ─────────────────────────────────────────────────────
 
 @app.route("/contacts/export.csv")
