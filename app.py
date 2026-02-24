@@ -2065,7 +2065,9 @@ def import_contacts_confirm():
 _LP_COL_MAP = {
     "name":                  ["contact name", "name", "full name", "investor name", "first name"],
     "company":               ["firm", "company", "company name", "organization", "fund manager",
-                              "employer", "firm name", "investor firm", "lp firm"],
+                              "employer", "firm name", "investor firm", "lp firm",
+                              "investor", "institution", "institution name", "plan sponsor",
+                              "fund name", "lp name", "lp", "entity", "entity name"],
     "title":                 ["title", "job title", "position", "role"],
     "email":                 ["email", "email address", "e-mail", "primary email"],
     "phone":                 ["phone", "phone number", "telephone", "mobile"],
