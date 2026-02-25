@@ -2011,12 +2011,16 @@ def campaign_send(campaign_id):
             pythoncom.CoInitialize()
             try:
                 outlook = win32com.client.Dispatch("Outlook.Application")
+                namespace = outlook.GetNamespace("MAPI")
+                sent_folder = namespace.GetDefaultFolder(5)  # 5 = olFolderSentMail
                 for row in rows:
                     try:
                         mail = outlook.CreateItem(0)
                         mail.To = row["to_email"]
                         mail.Subject = row["subject"]
                         mail.HTMLBody = row["body"]
+                        mail.DeleteAfterSubmit = False
+                        mail.SaveSentMessageFolder = sent_folder
                         mail.Send()
                         result["sent"] += 1
                         result[f"ok_{row['id']}"] = True
