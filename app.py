@@ -6,9 +6,11 @@ from datetime import datetime, date, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, session
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 
-CRM_PASSWORD = os.environ.get("CRM_PASSWORD", "acre2026")
+CRM_PASSWORD = os.environ.get("CRM_PASSWORD")
+if not CRM_PASSWORD:
+    raise RuntimeError("CRM_PASSWORD environment variable is not set.")
 
 
 @app.before_request
