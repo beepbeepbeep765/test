@@ -60,17 +60,68 @@ def fmt_datetime(value):
     return s
 
 DATABASE = os.environ.get("DATABASE_PATH", "crm.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")  # PostgreSQL for shared/production use
+
+
+class _PgConn:
+    """Thin adapter so psycopg2 behaves like sqlite3 for this app."""
+
+    def __init__(self, raw):
+        self._c = raw
+
+    @staticmethod
+    def _fix(sql):
+        return sql.replace("?", "%s")
+
+    def execute(self, sql, params=()):
+        import psycopg2.extras
+        cur = self._c.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute(self._fix(sql), params or ())
+        return cur
+
+    def executemany(self, sql, params_list):
+        cur = self._c.cursor()
+        cur.executemany(self._fix(sql), params_list)
+        return cur
+
+    def execute_ddl(self, sql):
+        """Execute a single DDL statement in autocommit mode (for init/migrations)."""
+        prev = self._c.autocommit
+        self._c.autocommit = True
+        try:
+            self._c.cursor().execute(sql)
+        except Exception:
+            pass
+        finally:
+            self._c.autocommit = prev
+
+    def commit(self):
+        self._c.commit()
+
+    def close(self):
+        self._c.close()
 
 
 def get_db():
+    if DATABASE_URL:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        return _PgConn(conn)
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db():
-    conn = get_db()
-    conn.executescript("""
+def _exec_insert(conn, sql, params=()):
+    """Run an INSERT and return the new row's id (works for both SQLite and PostgreSQL)."""
+    if DATABASE_URL:
+        cur = conn.execute(sql + " RETURNING id", params)
+        return cur.fetchone()[0]
+    cur = conn.execute(sql, params)
+    return cur.lastrowid
+
+
+_SCHEMA_SCRIPT = """
         CREATE TABLE IF NOT EXISTS deals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -261,39 +312,57 @@ def init_db():
             FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
             FOREIGN KEY (contact_id) REFERENCES gp_contacts(id)
         );
-    """)
+"""
 
-    # Safe migrations for existing databases
-    for stmt in [
-        "ALTER TABLE outreach ADD COLUMN follow_up_date TEXT",
-        "ALTER TABLE gp_contacts ADD COLUMN next_contact_date TEXT",
-        "ALTER TABLE outreach ADD COLUMN stage TEXT DEFAULT 'Initial Email'",
-        "ALTER TABLE outreach ADD COLUMN interest_level TEXT DEFAULT 'Unknown'",
-        "ALTER TABLE deals ADD COLUMN purchase_price TEXT",
-        "ALTER TABLE deals ADD COLUMN units_sf TEXT",
-        "ALTER TABLE deals ADD COLUMN noi_current TEXT",
-        "ALTER TABLE deals ADD COLUMN noi_projected TEXT",
-        "ALTER TABLE deals ADD COLUMN cap_rate TEXT",
-        "ALTER TABLE deals ADD COLUMN exit_cap_rate TEXT",
-        "ALTER TABLE deals ADD COLUMN ltv TEXT",
-        "ALTER TABLE deals ADD COLUMN hold_period TEXT",
-        "ALTER TABLE deals ADD COLUMN irr_target TEXT",
-        "ALTER TABLE deals ADD COLUMN equity_multiple TEXT",
-        "ALTER TABLE deals ADD COLUMN closing_date TEXT",
-        "ALTER TABLE emails ADD COLUMN from_addr TEXT",
-        "ALTER TABLE emails ADD COLUMN direction TEXT DEFAULT 'sent'",
-        "ALTER TABLE emails ADD COLUMN tags TEXT",
-        "ALTER TABLE deals ADD COLUMN email_keywords TEXT",
-        "ALTER TABLE campaigns ADD COLUMN target_audience TEXT DEFAULT 'gp'",
-        "ALTER TABLE campaign_emails ADD COLUMN lp_investor_id INTEGER",
-        "ALTER TABLE gp_contacts ADD COLUMN import_batch_id INTEGER",
-        "ALTER TABLE lp_investors ADD COLUMN import_batch_id INTEGER",
-        "ALTER TABLE contact_notes ADD COLUMN note_html TEXT",
-    ]:
-        try:
-            conn.execute(stmt)
-        except Exception:
-            pass
+_MIGRATIONS = [
+    "ALTER TABLE outreach ADD COLUMN follow_up_date TEXT",
+    "ALTER TABLE gp_contacts ADD COLUMN next_contact_date TEXT",
+    "ALTER TABLE outreach ADD COLUMN stage TEXT DEFAULT 'Initial Email'",
+    "ALTER TABLE outreach ADD COLUMN interest_level TEXT DEFAULT 'Unknown'",
+    "ALTER TABLE deals ADD COLUMN purchase_price TEXT",
+    "ALTER TABLE deals ADD COLUMN units_sf TEXT",
+    "ALTER TABLE deals ADD COLUMN noi_current TEXT",
+    "ALTER TABLE deals ADD COLUMN noi_projected TEXT",
+    "ALTER TABLE deals ADD COLUMN cap_rate TEXT",
+    "ALTER TABLE deals ADD COLUMN exit_cap_rate TEXT",
+    "ALTER TABLE deals ADD COLUMN ltv TEXT",
+    "ALTER TABLE deals ADD COLUMN hold_period TEXT",
+    "ALTER TABLE deals ADD COLUMN irr_target TEXT",
+    "ALTER TABLE deals ADD COLUMN equity_multiple TEXT",
+    "ALTER TABLE deals ADD COLUMN closing_date TEXT",
+    "ALTER TABLE emails ADD COLUMN from_addr TEXT",
+    "ALTER TABLE emails ADD COLUMN direction TEXT DEFAULT 'sent'",
+    "ALTER TABLE emails ADD COLUMN tags TEXT",
+    "ALTER TABLE deals ADD COLUMN email_keywords TEXT",
+    "ALTER TABLE campaigns ADD COLUMN target_audience TEXT DEFAULT 'gp'",
+    "ALTER TABLE campaign_emails ADD COLUMN lp_investor_id INTEGER",
+    "ALTER TABLE gp_contacts ADD COLUMN import_batch_id INTEGER",
+    "ALTER TABLE lp_investors ADD COLUMN import_batch_id INTEGER",
+    "ALTER TABLE contact_notes ADD COLUMN note_html TEXT",
+]
+
+
+def init_db():
+    conn = get_db()
+    if DATABASE_URL:
+        # PostgreSQL: run each CREATE TABLE individually, converting SQLite-specific syntax
+        for stmt in _SCHEMA_SCRIPT.split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                pg = (stmt
+                      .replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+                      .replace("(datetime('now'))", "to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')"))
+                conn.execute_ddl(pg)
+        # Migrations: PostgreSQL supports ADD COLUMN IF NOT EXISTS so these never error
+        for stmt in _MIGRATIONS:
+            conn.execute_ddl(stmt.replace("ADD COLUMN ", "ADD COLUMN IF NOT EXISTS "))
+    else:
+        conn.executescript(_SCHEMA_SCRIPT)
+        for stmt in _MIGRATIONS:
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
 
     # Seed default email templates once
     if conn.execute("SELECT COUNT(*) FROM email_templates").fetchone()[0] == 0:
@@ -1863,11 +1932,11 @@ def new_campaign():
                 return render_template("campaign_new.html", templates=templates_list,
                                        gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
-            cur = conn.execute(
+            campaign_id = _exec_insert(
+                conn,
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
                 (name, subject, body, "lp"),
             )
-            campaign_id = cur.lastrowid
 
             for inv in recipients:
                 rendered_subject = _apply_merge_lp(subject, inv)
@@ -1912,11 +1981,11 @@ def new_campaign():
                 return render_template("campaign_new.html", templates=templates_list,
                                        gp_batches=gp_batches, lp_batches=lp_batches, title="New Campaign")
 
-            cur = conn.execute(
+            campaign_id = _exec_insert(
+                conn,
                 "INSERT INTO campaigns (name, subject, body_template, target_audience) VALUES (?, ?, ?, ?)",
                 (name, subject, body, "gp"),
             )
-            campaign_id = cur.lastrowid
 
             for gp in recipients:
                 rendered_subject = _apply_merge(subject, gp)
@@ -2233,11 +2302,11 @@ def import_contacts_confirm():
     valid_entries = [e for e in entries if e["name"] or e["email"]]
 
     conn = get_db()
-    cur = conn.execute(
+    batch_id = _exec_insert(
+        conn,
         "INSERT INTO import_batches (label, type, count) VALUES (?, 'gp', ?)",
         (import_label, len(valid_entries)),
     )
-    batch_id = cur.lastrowid
 
     imported = 0
     for entry in valid_entries:
@@ -2377,11 +2446,11 @@ def import_lp_investors_confirm():
     valid_entries = [e for e in entries if e["name"] or e["email"]]
 
     conn = get_db()
-    cur = conn.execute(
+    batch_id = _exec_insert(
+        conn,
         "INSERT INTO import_batches (label, type, count) VALUES (?, 'lp', ?)",
         (import_label, len(valid_entries)),
     )
-    batch_id = cur.lastrowid
 
     imported = 0
     for entry in valid_entries:
