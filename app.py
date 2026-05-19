@@ -1044,10 +1044,12 @@ def outlook_sync(deal_id):
                 try:
                     outlook = win32com.client.Dispatch("Outlook.Application")
                     ns = outlook.GetNamespace("MAPI")
-                    sent = ns.GetDefaultFolder(5)
                     cutoff = datetime.now() - timedelta(days=days)
                     found = []
-                    for item in sent.Items:
+
+                    # Search Sent Items — emails you sent to this contact
+                    sent_folder = ns.GetDefaultFolder(5)
+                    for item in sent_folder.Items:
                         try:
                             if item.Class != 43:
                                 continue
@@ -1060,11 +1062,43 @@ def outlook_sync(deal_id):
                             found.append({
                                 "subject": item.Subject or "",
                                 "to": item.To or "",
+                                "from_addr": item.SenderEmailAddress or "",
+                                "from_name": item.SenderName or "",
                                 "sent_on": sent_on.strftime("%Y-%m-%d"),
                                 "preview": (item.Body or "")[:400].replace("\r\n", " ").replace("\n", " "),
+                                "folder": "Sent",
                             })
                         except Exception:
                             continue
+
+                    # Search Inbox — emails FROM this contact, or threads they were on
+                    inbox = ns.GetDefaultFolder(6)
+                    for item in inbox.Items:
+                        try:
+                            if item.Class != 43:
+                                continue
+                            received_on = item.ReceivedTime.replace(tzinfo=None)
+                            if received_on < cutoff:
+                                continue
+                            all_addrs = (
+                                (item.SenderEmailAddress or "") + ";" +
+                                (item.To or "") + ";" + (item.CC or "")
+                            )
+                            if search_email.lower() not in all_addrs.lower():
+                                continue
+                            found.append({
+                                "subject": item.Subject or "",
+                                "to": item.To or "",
+                                "from_addr": item.SenderEmailAddress or "",
+                                "from_name": item.SenderName or "",
+                                "sent_on": received_on.strftime("%Y-%m-%d"),
+                                "preview": (item.Body or "")[:400].replace("\r\n", " ").replace("\n", " "),
+                                "folder": "Received",
+                            })
+                        except Exception:
+                            continue
+
+                    found.sort(key=lambda x: x["sent_on"], reverse=True)
                     result["emails"] = found
                 finally:
                     pythoncom.CoUninitialize()
